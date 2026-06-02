@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
-    <title>DPM Camera Tracker v2.8</title>
+    <title>DPM AWT Job Tracker v1.3</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
@@ -172,7 +172,7 @@
     <div class="container">
         <div class="map-section"><div id="map"></div></div>
         <div class="sidebar">
-            <h2>DPM Camera Tracker v2.8</h2>
+            <h2>DPM AWT Job Tracker v1.3</h2>
             <div class="stats">
                 <div class="stat" onclick="window.filterByStatus('red')">        <div class="stat-num" style="color:var(--red)"       id="stat-red">0</div>       <div class="stat-label">Not Started</div></div>
                 <div class="stat" onclick="window.filterByStatus('yellow')">     <div class="stat-num" style="color:var(--yellow)"    id="stat-yellow">0</div>    <div class="stat-label">In Progress</div></div>
@@ -779,7 +779,7 @@
                 // 3. Append the two special locations
                 locs = [
                     {n:"DPM Office",a:"520 E NW Hwy, Grapevine, TX 76051",t:32.9418,g:-97.0725,special:true},
-                    {n:"Bill's Office",a:"615 Judy Lane, Seagoville, TX 75159",t:32.6394,g:-96.5386,special:true},
+                    {n:"AWT Office",a:"105 W Washington St, Rockwall, TX 75087",t:32.9300,g:-96.4609,special:true},
                     ...loadedLocs
                 ];
 
