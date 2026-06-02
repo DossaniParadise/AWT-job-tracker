@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+    <title>DPM Camera Tracker v2.8</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg: #0a0e27;
+            --bg2: #1a2140;
+            --bg3: #111830;
+            --red: #ff6b6b;
+            --yellow: #ffd93d;
+            --green: #6bcf7f;
+            --darkgreen: #2d7a4f;
+            --blue: #74b9ff;
+            --purple: #a855f7;
+            --text: #ffffff;
+            --text2: #cbd5e1;
+            --border: #2d3a5f;
+        }
+        body { font-family: 'Space Mono', monospace; background: var(--bg); color: var(--text); }
+
+        .container { display: grid; grid-template-columns: 1fr 500px; height: 100vh; }
+        .map-section { position: relative; }
+        #map { width: 100%; height: 100%; filter: brightness(0.9); }
+
+        .sidebar { background: var(--bg); overflow-y: auto; padding: 20px; }
+        .sidebar::-webkit-scrollbar { width: 0; height: 0; }
+        .sidebar { scrollbar-width: none; -ms-overflow-style: none; }
+        .sidebar h2 { font-size: 18px; margin-bottom: 20px; }
+
+        /* ── Stats bar ── */
+        .stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 20px; }
+        .stat { background: var(--bg2); padding: 12px; border-radius: 8px; text-align: center; border: 1px solid var(--border); cursor: pointer; transition: all 0.2s; }
+        .stat:hover { transform: translateY(-2px); border-color: var(--blue); }
+        .stat:active { transform: translateY(0); }
+        .stat-num { font-size: 24px; font-weight: 700; }
+        .stat-label { font-size: 9px; color: var(--text2); text-transform: uppercase; margin-top: 4px; }
+
+        /* ── Location columns ── */
+        .location-list { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .location-column { display: flex; flex-direction: column; gap: 8px; max-height: calc(100vh - 250px); overflow-y: auto; }
+        .location-column::-webkit-scrollbar { width: 0; height: 0; }
+        .location-column { scrollbar-width: none; -ms-overflow-style: none; }
+        .column-header { font-size: 12px; font-weight: 700; color: var(--text2); padding: 8px 0; border-bottom: 2px solid var(--border); margin-bottom: 4px; }
+
+        /* ── Location cards ── */
+        .card { background: var(--bg2); border: 2px solid var(--border); border-radius: 8px; padding: 12px; cursor: pointer; transition: all 0.2s; }
+        .card:hover { border-color: var(--blue); transform: translateY(-1px); }
+        .card-name { font-size: 15px; font-weight: 700; margin-bottom: 6px; line-height: 1.3; }
+        .card-addr { font-size: 12px; color: var(--text2); margin-bottom: 8px; line-height: 1.4; }
+        .card-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+        .ticket-badge { display: inline-block; padding: 3px 10px; border-radius: 4px; font-size: 11px; font-weight: 700; }
+        .badge-open { background: rgba(116,185,255,0.15); color: var(--blue); border: 1px solid var(--blue); }
+        .badge-none { background: rgba(45,58,95,0.4); color: var(--text2); border: 1px solid var(--border); }
+        .badge-status { display: inline-block; padding: 3px 10px; border-radius: 4px; font-size: 11px; font-weight: 700; }
+        .status-red       { background: rgba(255,107,107,0.2);  color: var(--red);       border: 1px solid var(--red); }
+        .status-yellow    { background: rgba(255,217,61,0.2);   color: var(--yellow);    border: 1px solid var(--yellow); }
+        .status-darkgreen { background: rgba(45,122,79,0.2);    color: var(--darkgreen); border: 1px solid var(--darkgreen); }
+        .status-green     { background: rgba(107,207,127,0.2);  color: var(--green);     border: 1px solid var(--green); }
+        .status-blue      { background: rgba(116,185,255,0.2);  color: var(--blue);      border: 1px solid var(--blue); }
+        .status-purple    { background: rgba(168,85,247,0.2);   color: var(--purple);    border: 1px solid var(--purple); }
+
+        /* ── Leaflet popup ── */
+        .leaflet-popup-content-wrapper { background: var(--bg); color: var(--text); border: 2px solid var(--border); border-radius: 12px; font-family: 'Space Mono', monospace; }
+        .leaflet-popup-content { margin: 0; width: 370px !important; }
+
+        /* ── Panel (popup + modal body) ── */
+        .panel { padding: 16px; }
+        .panel-title { font-size: 16px; font-weight: 700; margin-bottom: 4px; line-height: 1.3; }
+        .panel-addr { font-size: 13px; color: var(--text2); margin-bottom: 14px; cursor: pointer; text-decoration: underline; line-height: 1.4; }
+        .panel-addr:hover { color: var(--blue); }
+
+        /* ── Archived ticket history ── */
+        .history-section { margin-bottom: 14px; }
+        .history-header { font-size: 11px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+        .archived-ticket { background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; margin-bottom: 6px; overflow: hidden; }
+        .archived-ticket-header { padding: 8px 12px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+        .archived-ticket-header:hover { background: rgba(255,255,255,0.03); }
+        .archived-ticket-label { font-size: 12px; font-weight: 700; color: var(--text2); }
+        .archived-ticket-body { display: none; padding: 10px 12px; border-top: 1px solid var(--border); }
+        .archived-ticket-body.open { display: block; }
+        .archived-field { margin-bottom: 8px; }
+        .archived-field-label { font-size: 10px; color: var(--text2); text-transform: uppercase; margin-bottom: 2px; }
+        .archived-field-value { font-size: 12px; line-height: 1.4; }
+        .archived-note { padding: 6px 0; border-bottom: 1px solid var(--border); }
+        .archived-note:last-child { border-bottom: none; }
+        .archived-note-date { font-size: 10px; color: var(--text2); margin-bottom: 2px; }
+        .archived-note-text { font-size: 12px; line-height: 1.4; }
+        .archived-note-photo img { margin-top: 6px; width: 100%; max-height: 140px; object-fit: cover; border-radius: 4px; border: 1px solid var(--border); cursor: pointer; }
+
+        /* ── Active ticket ── */
+        .active-ticket-section { background: var(--bg3); border: 1px solid var(--blue); border-radius: 8px; padding: 14px; margin-bottom: 12px; }
+        .active-ticket-label { font-size: 11px; font-weight: 700; color: var(--blue); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; }
+
+        /* ── Notes list (saved notes in active ticket) ── */
+        .notes-list { margin-bottom: 10px; }
+        .note-item { background: var(--bg2); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; margin-bottom: 6px; }
+        .note-item-date { font-size: 10px; color: var(--text2); margin-bottom: 3px; }
+        .note-item-text { font-size: 12px; line-height: 1.4; margin-bottom: 4px; }
+        .note-item-photo img { width: 100%; max-height: 140px; object-fit: cover; border-radius: 4px; border: 1px solid var(--border); cursor: pointer; margin-top: 4px; }
+
+        /* ── Add note area ── */
+        .add-note-area { background: var(--bg2); border: 1px solid var(--border); border-radius: 6px; padding: 10px; margin-bottom: 10px; }
+        .add-note-label { font-size: 10px; font-weight: 700; color: var(--text2); text-transform: uppercase; margin-bottom: 6px; }
+        .add-note-textarea { width: 100%; background: transparent; border: none; color: var(--text); font-family: 'Space Mono', monospace; font-size: 13px; resize: vertical; min-height: 50px; outline: none; }
+        .add-note-photo-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+        .add-note-photo-btn { font-size: 11px; padding: 4px 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text2); cursor: pointer; font-family: 'Space Mono', monospace; }
+        .add-note-photo-btn:hover { border-color: var(--blue); color: var(--blue); }
+        .note-photo-preview { width: 48px; height: 48px; object-fit: cover; border-radius: 4px; border: 1px solid var(--border); cursor: pointer; }
+        .note-photo-clear { font-size: 11px; color: var(--red); cursor: pointer; background: none; border: none; font-family: 'Space Mono', monospace; }
+        .upload-status { font-size: 11px; color: var(--text2); }
+
+        /* ── Forms ── */
+        .form-group { margin-bottom: 12px; }
+        .form-label { font-size: 12px; font-weight: 700; color: var(--text2); margin-bottom: 4px; display: block; }
+        .form-input, .form-select, .form-textarea { width: 100%; background: var(--bg2); border: 2px solid var(--border); border-radius: 6px; padding: 10px; color: var(--text); font-family: 'Space Mono', monospace; font-size: 14px; }
+        .form-textarea { min-height: 60px; resize: vertical; }
+
+        /* ── Buttons ── */
+        .btn-group { display: flex; gap: 8px; }
+        .btn { flex: 1; padding: 10px; border: none; border-radius: 6px; font-family: 'Space Mono', monospace; font-size: 12px; font-weight: 700; cursor: pointer; }
+        .btn-primary   { background: var(--blue); color: #0a0e27; }
+        .btn-secondary { background: var(--bg2); color: var(--text); border: 2px solid var(--border); }
+        .btn-success   { background: var(--green); color: #0a0e27; }
+        .btn-danger    { background: rgba(255,107,107,0.15); color: var(--red); border: 2px solid var(--red); flex: 0; padding: 10px 14px; }
+        .btn-new-ticket { width: 100%; padding: 12px; border: 2px dashed var(--border); border-radius: 8px; background: transparent; color: var(--text2); font-family: 'Space Mono', monospace; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s; margin-bottom: 4px; }
+        .btn-new-ticket:hover { border-color: var(--blue); color: var(--blue); }
+
+        /* ── Divider ── */
+        .section-divider { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
+
+        /* ── Mobile modal ── */
+        .mobile-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10000; align-items: center; justify-content: center; padding: 20px; }
+        .mobile-modal.active { display: flex; }
+        .modal-content { background: var(--bg); border: 2px solid var(--border); border-radius: 12px; max-width: 500px; width: 100%; max-height: 90vh; overflow-y: auto; }
+        .modal-close { position: sticky; top: 0; background: var(--bg); padding: 12px; border-bottom: 2px solid var(--border); text-align: right; z-index: 1; }
+        .modal-close button { background: var(--bg2); color: var(--text); border: 2px solid var(--border); padding: 10px 18px; border-radius: 6px; font-family: 'Space Mono', monospace; font-size: 15px; font-weight: 700; cursor: pointer; }
+
+        /* ── Scroll to top ── */
+        .scroll-top-btn { display: none; }
+
+        /* ── Responsive ── */
+        @media (max-width: 1200px) and (min-width: 700px) {
+            .container { grid-template-columns: 1fr 340px; }
+            .stat { padding: 8px 4px; }
+            .stat-num { font-size: 18px; }
+            .stat-label { font-size: 8px; }
+            .card-name { font-size: 13px; }
+            .card-addr { font-size: 11px; }
+        }
+        @media (max-width: 699px) and (orientation: portrait) {
+            .container { display: block; }
+            .map-section { display: none; }
+            .sidebar { width: 100%; min-height: 100vh; overflow-y: visible; }
+            .location-column { max-height: none; overflow-y: visible; }
+            .scroll-top-btn { display: block; position: fixed; bottom: 20px; right: 20px; width: 56px; height: 56px; background: var(--blue); color: white; border: none; border-radius: 50%; font-size: 24px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 12px rgba(59,130,246,0.5); z-index: 9999; }
+        }
+        @media (max-width: 699px) and (orientation: landscape) {
+            .container { display: block; }
+            .sidebar { display: none; }
+            .map-section { width: 100%; height: 100vh; }
+            #map { height: 100vh; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="map-section"><div id="map"></div></div>
+        <div class="sidebar">
+            <h2>DPM Camera Tracker v2.8</h2>
+            <div class="stats">
+                <div class="stat" onclick="window.filterByStatus('red')">        <div class="stat-num" style="color:var(--red)"       id="stat-red">0</div>       <div class="stat-label">Not Started</div></div>
+                <div class="stat" onclick="window.filterByStatus('yellow')">     <div class="stat-num" style="color:var(--yellow)"    id="stat-yellow">0</div>    <div class="stat-label">In Progress</div></div>
+                <div class="stat" onclick="window.filterByStatus('darkgreen')">  <div class="stat-num" style="color:var(--darkgreen)" id="stat-darkgreen">0</div> <div class="stat-label">Done &amp; Unpaid</div></div>
+                <div class="stat" onclick="window.filterByStatus('green')">      <div class="stat-num" style="color:var(--green)"     id="stat-green">0</div>     <div class="stat-label">Done &amp; Paid</div></div>
+                <div class="stat" onclick="window.filterByStatus('none')">       <div class="stat-num" style="color:var(--text2)"     id="stat-none">0</div>      <div class="stat-label">No Tickets</div></div>
+            </div>
+            <div class="location-list" id="list"></div>
+        </div>
+    </div>
+
+    <div class="mobile-modal" id="modal">
+        <div class="modal-content">
+            <div class="modal-close"><button onclick="window.closeModal()">✕ Close</button></div>
+            <div id="modal-body"></div>
+        </div>
+    </div>
+
+    <button class="scroll-top-btn" onclick="window.scrollToTop()">↑</button>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
+        import { getDatabase, ref, set, get, onValue } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js';
+
+        // Ticket database configuration
+        const ticketConfig = {
+            apiKey: "AIzaSyAlybpAIuouEZKVhIUxLlf3fjuAm_8Wqyo",
+            authDomain: "awt-tracker.firebaseapp.com",
+            databaseURL: "https://awt-tracker-default-rtdb.firebaseio.com",
+            projectId: "awt-tracker",
+            storageBucket: "awt-tracker.firebasestorage.app",
+            messagingSenderId: "890835294213",
+            appId: "1:890835294213:web:c10b368186d8f610ba646c"
+        };
+
+        // Location data source configuration
+        const locationConfig = {
+            apiKey: "AIzaSyDIGLmJ5r_fBhB5xOL8oadQ7csN3wGh2dI",
+            authDomain: "dpm-alignment.firebaseapp.com",
+            databaseURL: "https://dpm-alignment-default-rtdb.firebaseio.com",
+            projectId: "dpm-alignment",
+            storageBucket: "dpm-alignment.firebasestorage.app",
+            messagingSenderId: "298588092433",
+            appId: "1:298588092433:web:694a9412658adac039d9b0"
+        };
+
+        const appTickets = initializeApp(ticketConfig, "ticketsApp");
+        const appLocations = initializeApp(locationConfig, "locationsApp");
+
+        const db = getDatabase(appTickets); // Keeps existing ticket logic unchanged
+        const dbLocs = getDatabase(appLocations);
+
+        const IMGBB_API_KEY = 'b733862d15744e2bfaa4329d122f4ba0';
+
+        // Will be populated dynamically
+        let locs = [];
+
+        // ─────────────────────────────────────────
+        // Map
+        // ─────────────────────────────────────────
+        const map = L.map('map').setView([32.9413343, -97.0731222], 10);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom:20, attribution:'© OpenStreetMap' }).addTo(map);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png', { maxZoom:20 }).addTo(map);
+
+        // ─────────────────────────────────────────
+        // State
+        // Firebase structure:
+        //   jobs/{locId}/tickets/{ticketId} = { s, v, issue, notes:[{n,t,photoUrl?}], archived, createdAt }
+        // ─────────────────────────────────────────
+        let data = {};
+        let markers = {};
+        let activeFilter = null;
+
+        // ─────────────────────────────────────────
+        // Helpers
+        // ─────────────────────────────────────────
+        function locId(l) { return `${l.t}_${l.g}`.replace(/\./g, '_'); }
+        function newTicketId() { return 'tk_' + Date.now() + '_' + Math.random().toString(36).slice(2,6); }
+
+        function statusLabel(s) {
+            return s==='red'?'Not Started':s==='yellow'?'In Progress':s==='darkgreen'?'Done & Unpaid':s==='green'?'Done & Paid':'No Issues';
+        }
+
+        function statusColor(s) {
+            return s==='red'?'#ff6b6b':s==='yellow'?'#ffd93d':s==='darkgreen'?'#2d7a4f':s==='green'?'#6bcf7f':'#74b9ff';
+        }
+
+        function getOpenTicket(locData) {
+            if(!locData?.tickets) return null;
+            return Object.values(locData.tickets).find(t => !t.archived) || null;
+        }
+
+        function getOpenTicketId(locData) {
+            if(!locData?.tickets) return null;
+            return Object.keys(locData.tickets).find(k => !locData.tickets[k].archived) || null;
+        }
+
+        function getSortedTickets(locData) {
+            if(!locData?.tickets) return [];
+            return Object.entries(locData.tickets)
+                .map(([id, t]) => ({id, ...t}))
+                .sort((a, b) => (a.createdAt||'').localeCompare(b.createdAt||''));
+        }
+
+        function getMarkerColor(locData) {
+            const open = getOpenTicket(locData);
+            if(open) return statusColor(open.s || 'blue');
+            if(locData?.tickets && Object.keys(locData.tickets).length > 0) return '#4a5568'; // has history, no open ticket
+            return '#74b9ff'; // no tickets at all
+        }
+
+        // ─────────────────────────────────────────
+        // Migration: v1 flat format → ticket system
+        // Runs once on boot. Safe to re-run (skips already-migrated).
+        // ─────────────────────────────────────────
+        async function migrateIfNeeded() {
+            const snap = await get(ref(db, 'jobs'));
+            const raw = snap.val();
+            if(!raw) return;
+
+            const writes = [];
+            for(const [lid, val] of Object.entries(raw)) {
+                if(!val || val.tickets) continue; // already migrated or empty
+                if(!val.s) continue; // not a recognizable old record
+
+                const tkId = newTicketId();
+                const ticket = {
+                    s: val.s,
+                    v: val.v || '',
+                    issue: val.issue || '',
+                    notes: val.notes || [],
+                    archived: val.s === 'green', // Done & Paid tickets auto-archive
+                    createdAt: new Date().toISOString(),
+                    migratedFrom: 'v1'
+                };
+                // Attach old photo to first note if present
+                if(val.photoUrl) {
+                    if(ticket.notes.length === 0) {
+                        ticket.notes.push({ n: '(photo from previous version)', t: new Date().toISOString(), photoUrl: val.photoUrl });
+                    } else {
+                        ticket.notes[0] = { ...ticket.notes[0], photoUrl: val.photoUrl };
+                    }
+                }
+                writes.push(set(ref(db, `jobs/${lid}/tickets/${tkId}`), ticket));
+            }
+            if(writes.length > 0) {
+                await Promise.all(writes);
+                console.log(`v2.8 migration: converted ${writes.length} location(s).`);
+            }
+        }
+
+        // ─────────────────────────────────────────
+        // Stats
+        // ─────────────────────────────────────────
+        function getEffectiveStatus(locData) {
+            // Open ticket wins. If no open ticket, use the most recent archived ticket's status.
+            const open = getOpenTicket(locData);
+            if(open) return open.s || 'blue';
+            const all = getSortedTickets(locData);
+            if(all.length > 0) return all[all.length - 1].s || 'blue';
+            return 'none';
+        }
+
+        function updateStats() {
+            const counts = { red:0, yellow:0, darkgreen:0, green:0, none:0 };
+            locs.forEach(l => {
+                if(l.special) return;
+                const s = getEffectiveStatus(data[locId(l)]);
+                if(s === 'blue' || s === 'none') counts.none++;
+                else counts[s] = (counts[s] || 0) + 1;
+            });
+            document.getElementById('stat-red').textContent       = counts.red;
+            document.getElementById('stat-yellow').textContent    = counts.yellow;
+            document.getElementById('stat-darkgreen').textContent = counts.darkgreen;
+            document.getElementById('stat-green').textContent     = counts.green;
+            document.getElementById('stat-none').textContent      = counts.none;
+        }
+
+        // ─────────────────────────────────────────
+        // Filter
+        // ─────────────────────────────────────────
+        window.filterByStatus = function(status) {
+            if(activeFilter === status) {
+                activeFilter = null;
+                document.querySelectorAll('.card').forEach(c => c.style.display = '');
+                document.querySelectorAll('.stat').forEach(s => s.style.opacity = '1');
+                return;
+            }
+            activeFilter = status;
+            document.querySelectorAll('.card').forEach(card => {
+                card.style.display = (card.dataset.filterStatus === status) ? '' : 'none';
+            });
+            document.querySelectorAll('.stat').forEach(s => s.style.opacity = '0.3');
+            const idx = {red:0, yellow:1, darkgreen:2, green:3, none:4};
+            if(idx[status] !== undefined) document.querySelectorAll('.stat')[idx[status]].style.opacity = '1';
+        };
+
+        // ─────────────────────────────────────────
+        // Sidebar list
+        // ─────────────────────────────────────────
+        function renderList() {
+            const ff=[], cs=[], specialFF=[], specialCS=[];
+            locs.forEach(l => {
+                if(l.special) {
+                    (l.n.includes('DPM') ? specialFF : specialCS).push(l);
+                } else if(l.n.includes('Burger King') || l.n.includes('Subway')) {
+                    ff.push(l);
+                } else {
+                    cs.push(l);
+                }
+            });
+
+            ff.sort((a,b) => {
+                const clean = n => { let x=n.replace('Burger King ','').replace('Subway ',''); if(x.startsWith('The ')) x=x.substring(4); return x; };
+                return clean(a.n).localeCompare(clean(b.n));
+            });
+            cs.sort((a,b) => {
+                const gn = n => { const m=n.match(/Paradise QS #(\d+)/); return m?parseInt(m[1]):null; };
+                const an=gn(a.n), bn=gn(b.n);
+                if(an!==null && bn!==null) return an-bn;
+                if(an!==null) return -1; if(bn!==null) return 1;
+                return a.n.localeCompare(b.n);
+            });
+
+            const mkCard = l => {
+                const lid = locId(l);
+                const c = document.createElement('div');
+                c.className = 'card';
+
+                if(l.special) {
+                    c.innerHTML = `<div class="card-name" style="color:var(--purple);">📍 ${l.n}</div><div class="card-addr" style="cursor:pointer;text-decoration:underline;" onclick="window.open('https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(l.a)}','_blank')">${l.a}</div>`;
+                    c.style.borderColor = 'var(--purple)';
+                    c.onclick = () => map.setView([l.t, l.g], 15);
+                    return c;
+                }
+
+                const d = data[lid];
+                const open = getOpenTicket(d);
+                const all = getSortedTickets(d);
+                const archivedCount = all.filter(t => t.archived).length;
+
+                // Filter status: open ticket wins, otherwise fall back to most recent archived
+                const effectiveStatus = getEffectiveStatus(d);
+                c.dataset.filterStatus = (effectiveStatus === 'blue' || effectiveStatus === 'none') ? 'none' : effectiveStatus;
+
+                // Card border reflects open ticket status
+                c.style.borderColor = open ? statusColor(open.s || 'blue') : 'var(--border)';
+
+                // Badge row
+                let metaHtml = '';
+                if(open) {
+                    metaHtml = `<span class="badge-status status-${open.s}">${statusLabel(open.s)}</span>`;
+                    if(archivedCount > 0) {
+                        metaHtml += `<span class="ticket-badge badge-none" style="font-size:10px;">+${archivedCount} archived</span>`;
+                    }
+                } else if(all.length > 0) {
+                    metaHtml = `<span class="ticket-badge badge-none">${archivedCount} archived</span>`;
+                } else {
+                    metaHtml = `<span class="ticket-badge badge-none">No tickets</span>`;
+                }
+
+                c.innerHTML = `<div class="card-name">${l.n}</div><div class="card-addr">${l.a}</div><div class="card-meta">${metaHtml}</div>`;
+                c.onclick = () => {
+                    if(window.innerWidth <= 699) {
+                        openMobilePanel(l);
+                    } else {
+                        map.setView([l.t, l.g], 13);
+                        setTimeout(() => markers[lid]?.m.openPopup(), 100);
+                    }
+                };
+                return c;
+            };
+
+            const list = document.getElementById('list');
+            list.innerHTML = '';
+
+            const c1 = document.createElement('div');
+            c1.className = 'location-column';
+            c1.innerHTML = '<div class="column-header">Fast Food</div>';
+            specialFF.forEach(l => c1.appendChild(mkCard(l)));
+            ff.forEach(l => c1.appendChild(mkCard(l)));
+
+            const c2 = document.createElement('div');
+            c2.className = 'location-column';
+            c2.innerHTML = '<div class="column-header">C-Store</div>';
+            specialCS.forEach(l => c2.appendChild(mkCard(l)));
+            cs.forEach(l => c2.appendChild(mkCard(l)));
+
+            list.appendChild(c1);
+            list.appendChild(c2);
+
+            // Reapply active filter
+            if(activeFilter) {
+                document.querySelectorAll('.card').forEach(card => {
+                    card.style.display = (card.dataset.filterStatus === activeFilter) ? '' : 'none';
+                });
+            }
+        }
+
+        // ─────────────────────────────────────────
+        // Build panel HTML
+        // ─────────────────────────────────────────
+        function buildPanel(l) {
+            const lid = locId(l);
+            const d = data[lid];
+            const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(l.a)}`;
+            const all = getSortedTickets(d);
+            const archived = all.filter(t => t.archived);
+            const open = all.find(t => !t.archived) || null;
+            const openId = open ? open.id : null;
+
+            let html = `<div class="panel">
+                <div class="panel-title">${l.n}</div>
+                <div class="panel-addr" onclick="window.open('${mapsUrl}','_blank')">📍 ${l.a}</div>`;
+
+            // ── Archived history ──
+            if(archived.length > 0) {
+                html += `<div class="history-section">
+                    <div class="history-header">📁 Ticket History (${archived.length})</div>`;
+
+                archived.forEach((t, idx) => {
+                    const displayNum = idx + 1;
+                    const displayDate = t.v || (t.createdAt ? new Date(t.createdAt).toLocaleDateString() : 'No date');
+                    const notes = t.notes || [];
+
+                    let notesHtml = notes.map(n => `
+                        <div class="archived-note">
+                            <div class="archived-note-date">${new Date(n.t).toLocaleString()}</div>
+                            ${n.n ? `<div class="archived-note-text">${n.n}</div>` : ''}
+                            ${n.photoUrl ? `<div class="archived-note-photo"><img src="${n.photoUrl}" onclick="window.open('${n.photoUrl}','_blank')" title="Click to open full size"></div>` : ''}
+                        </div>`).join('');
+
+                    html += `<div class="archived-ticket">
+                        <div class="archived-ticket-header" onclick="this.nextElementSibling.classList.toggle('open')">
+                            <span class="archived-ticket-label">Ticket #${displayNum} — ${displayDate}</span>
+                            <span class="badge-status status-${t.s}" style="font-size:10px;">${statusLabel(t.s)}</span>
+                        </div>
+                        <div class="archived-ticket-body">
+                            ${t.issue ? `<div class="archived-field"><div class="archived-field-label">Issue</div><div class="archived-field-value">${t.issue}</div></div>` : ''}
+                            ${notesHtml ? `<div class="archived-field"><div class="archived-field-label">Notes</div>${notesHtml}</div>` : ''}
+                            ${!t.issue && !notesHtml ? `<div style="color:var(--text2);font-size:12px;">No details recorded.</div>` : ''}
+                        </div>
+                    </div>`;
+                });
+
+                html += `</div><hr class="section-divider">`;
+            }
+
+            // ── Active ticket ──
+            if(open) {
+                const notes = open.notes || [];
+                const notesListHtml = notes.map(n => `
+                    <div class="note-item">
+                        <div class="note-item-date">${new Date(n.t).toLocaleString()}</div>
+                        ${n.n ? `<div class="note-item-text">${n.note_item_text || n.n}</div>` : ''}
+                        ${n.photoUrl ? `<div class="note-item-photo"><img src="${n.photoUrl}" onclick="window.open('${n.photoUrl}','_blank')" title="Click for full size"></div>` : ''}
+                    </div>`).join('');
+
+                html += `<div class="active-ticket-section">
+                    <div class="active-ticket-label">🎫 Active Ticket</div>
+                    <div class="form-group">
+                        <label class="form-label">Status</label>
+                        <select class="form-select" id="tk-s-${lid}" onchange="window.previewStatus('${lid}')">
+                            <option value="blue"      ${open.s==='blue'?      'selected':''}>No Issues</option>
+                            <option value="red"       ${open.s==='red'?       'selected':''}>Not Started</option>
+                            <option value="yellow"    ${open.s==='yellow'?    'selected':''}>In Progress</option>
+                            <option value="darkgreen" ${open.s==='darkgreen'? 'selected':''}>Done &amp; Unpaid</option>
+                            <option value="green"     ${open.s==='green'?     'selected':''}>Done &amp; Paid</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Visit Date</label>
+                        <input type="date" class="form-input" id="tk-v-${lid}" value="${open.v || ''}">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Issue Description</label>
+                        <textarea class="form-textarea" id="tk-i-${lid}">${open.issue || ''}</textarea>
+                    </div>
+                    ${notesListHtml ? `<div class="form-label" style="margin-bottom:6px;">Notes</div><div class="notes-list">${notesListHtml}</div>` : ''}
+                    <div class="add-note-area">
+                        <div class="add-note-label">Add Note</div>
+                        <textarea class="add-note-textarea" id="tk-n-${lid}" placeholder="Type a note..."></textarea>
+                        <div class="add-note-photo-row">
+                            <input type="file" accept="image/*" id="tk-f-${lid}" style="display:none" onchange="window.handleNotePhoto('${lid}','${openId}',this)">
+                            <button class="add-note-photo-btn" onclick="document.getElementById('tk-f-${lid}').click()">📎 Attach Photo</button>
+                            <span class="upload-status" id="tk-upload-${lid}"></span>
+                            <img id="tk-img-${lid}" style="display:none" class="note-photo-preview" onclick="window.open(this.src,'_blank')">
+                            <button class="note-photo-clear" id="tk-imgclear-${lid}" style="display:none" onclick="window.clearNotePhoto('${lid}')">✕ remove</button>
+                            <input type="hidden" id="tk-p-${lid}" value="">
+                        </div>
+                    </div>
+                    <div class="btn-group" style="margin-top:10px;">
+                        <button class="btn btn-primary"   onclick="window.saveTicket('${lid}','${openId}')">💾 Save</button>
+                        <button class="btn btn-success"   onclick="window.archiveTicket('${lid}','${openId}')">✓ Close Ticket</button>
+                        <button class="btn btn-danger"    onclick="window.deleteTicket('${lid}','${openId}')">🗑</button>
+                    </div>
+                </div>`;
+            } else {
+                html += `<button class="btn-new-ticket" onclick="window.createTicket('${lid}')">＋ Open New Ticket</button>`;
+            }
+
+            html += `</div>`;
+            return html;
+        }
+
+        // ─────────────────────────────────────────
+        // Markers
+        // ─────────────────────────────────────────
+        function addMarkers() {
+            locs.forEach(l => {
+                const lid = locId(l);
+                if(l.special) {
+                    const m = L.circleMarker([l.t, l.g], { radius:10, fillColor:'#a855f7', fillOpacity:1, color:'#fff', weight:2 }).addTo(map);
+                    markers[lid] = {m, l};
+                } else {
+                    const m = L.circleMarker([l.t, l.g], {
+                        radius:8, fillColor: getMarkerColor(data[lid]), fillOpacity:1, color:'#fff', weight:2
+                    }).addTo(map).bindPopup('', {maxWidth:390});
+                    m.on('popupopen', () => m.setPopupContent(buildPanel(l)));
+                    markers[lid] = {m, l};
+                }
+            });
+        }
+
+        function updateMarker(lid) {
+            if(markers[lid] && !markers[lid].l.special) {
+                markers[lid].m.setStyle({ fillColor: getMarkerColor(data[lid]) });
+            }
+        }
+
+        // ─────────────────────────────────────────
+        // Ticket actions
+        // ─────────────────────────────────────────
+        window.previewStatus = function(lid) {
+            const el = document.getElementById(`tk-s-${lid}`);
+            if(el && markers[lid]) markers[lid].m.setStyle({ fillColor: statusColor(el.value) });
+        };
+
+        window.saveTicket = async function(lid, tkId) {
+            try {
+                const existing = data[lid]?.tickets?.[tkId] || {};
+                const notes = [...(existing.notes || [])];
+
+                const noteText = document.getElementById(`tk-n-${lid}`)?.value.trim() || '';
+                const photoUrl = document.getElementById(`tk-p-${lid}`)?.value || '';
+                if(noteText || photoUrl) {
+                    const newNote = { n: noteText, t: new Date().toISOString() };
+                    if(photoUrl) newNote.photoUrl = photoUrl;
+                    notes.push(newNote);
+                }
+
+                const updated = {
+                    ...existing,
+                    s:     document.getElementById(`tk-s-${lid}`).value,
+                    v:     document.getElementById(`tk-v-${lid}`).value,
+                    issue: document.getElementById(`tk-i-${lid}`).value,
+                    notes
+                };
+
+                await set(ref(db, `jobs/${lid}/tickets/${tkId}`), updated);
+                alert('✓ Saved!');
+            } catch(err) {
+                alert('Error saving: ' + err.message);
+            }
+        };
+
+        window.archiveTicket = async function(lid, tkId) {
+            if(!confirm('Close and archive this ticket? It will remain visible in the ticket history.')) return;
+            try {
+                const existing = data[lid]?.tickets?.[tkId] || {};
+                const notes = [...(existing.notes || [])];
+                const noteText = document.getElementById(`tk-n-${lid}`)?.value.trim() || '';
+                const photoUrl = document.getElementById(`tk-p-${lid}`)?.value || '';
+                if(noteText || photoUrl) {
+                    const newNote = { n: noteText, t: new Date().toISOString() };
+                    if(photoUrl) newNote.photoUrl = photoUrl;
+                    notes.push(newNote);
+                }
+                const updated = {
+                    ...existing,
+                    s:          document.getElementById(`tk-s-${lid}`)?.value  || existing.s,
+                    v:          document.getElementById(`tk-v-${lid}`)?.value  || existing.v,
+                    issue:      document.getElementById(`tk-i-${lid}`)?.value  || existing.issue,
+                    notes,
+                    archived:   true,
+                    archivedAt: new Date().toISOString()
+                };
+                await set(ref(db, `jobs/${lid}/tickets/${tkId}`), updated);
+                markers[lid]?.m.closePopup();
+                window.closeModal();
+            } catch(err) {
+                alert('Error closing ticket: ' + err.message);
+            }
+        };
+
+        window.deleteTicket = async function(lid, tkId) {
+            if(!confirm('Permanently delete this ticket? This cannot be undone.')) return;
+            try {
+                await set(ref(db, `jobs/${lid}/tickets/${tkId}`), null);
+                markers[lid]?.m.closePopup();
+                window.closeModal();
+            } catch(err) {
+                alert('Error deleting: ' + err.message);
+            }
+        };
+
+        window.createTicket = async function(lid) {
+            try {
+                const tkId = newTicketId();
+                const ticket = { s:'red', v:'', issue:'', notes:[], archived:false, createdAt: new Date().toISOString() };
+                await set(ref(db, `jobs/${lid}/tickets/${tkId}`), ticket);
+            } catch(err) {
+                alert('Error creating ticket: ' + err.message);
+            }
+        };
+
+        // ─────────────────────────────────────────
+        // Per-note photo upload (imgbb)
+        // ─────────────────────────────────────────
+        window.handleNotePhoto = async function(lid, tkId, inputEl) {
+            const file = inputEl.files?.[0];
+            if(!file) return;
+            if(!file.type.startsWith('image/')) { alert('Please choose an image file.'); inputEl.value=''; return; }
+
+            const statusEl  = document.getElementById(`tk-upload-${lid}`);
+            const imgEl     = document.getElementById(`tk-img-${lid}`);
+            const hiddenEl  = document.getElementById(`tk-p-${lid}`);
+            const clearBtn  = document.getElementById(`tk-imgclear-${lid}`);
+
+            statusEl.textContent = 'Uploading…';
+            const localUrl = URL.createObjectURL(file);
+            imgEl.src = localUrl;
+            imgEl.style.display = '';
+            imgEl.style.opacity = '0.5';
+
+            try {
+                const formData = new FormData();
+                formData.append('image', file);
+                const res  = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, { method:'POST', body:formData });
+                const json = await res.json();
+                if(!json.success) throw new Error(json.error?.message || 'Upload failed');
+
+                hiddenEl.value       = json.data.url;
+                imgEl.src            = json.data.url;
+                imgEl.style.opacity  = '1';
+                clearBtn.style.display = '';
+                statusEl.textContent = '✓ Ready';
+                URL.revokeObjectURL(localUrl);
+            } catch(err) {
+                imgEl.style.display  = 'none';
+                hiddenEl.value       = '';
+                inputEl.value        = '';
+                statusEl.textContent = '';
+                URL.revokeObjectURL(localUrl);
+                alert('Photo upload failed: ' + err.message);
+            }
+        };
+
+        window.clearNotePhoto = function(lid) {
+            document.getElementById(`tk-p-${lid}`).value          = '';
+            document.getElementById(`tk-img-${lid}`).style.display = 'none';
+            document.getElementById(`tk-imgclear-${lid}`).style.display = 'none';
+            document.getElementById(`tk-upload-${lid}`).textContent = '';
+            const f = document.getElementById(`tk-f-${lid}`);
+            if(f) f.value = '';
+        };
+
+        // ─────────────────────────────────────────
+        // Mobile modal
+        // ─────────────────────────────────────────
+        function openMobilePanel(l) {
+            document.getElementById('modal-body').innerHTML = buildPanel(l);
+            document.getElementById('modal').classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        window.closeModal = function() {
+            document.getElementById('modal').classList.remove('active');
+            document.body.style.overflow = '';
+        };
+
+        window.scrollToTop = function() {
+            document.querySelector('.sidebar')?.scrollTo({ top:0, behavior:'smooth' });
+        };
+
+        // ─────────────────────────────────────────
+        // Initialization Boot Sequence
+        // ─────────────────────────────────────────
+        (async () => {
+            try {
+                // 1. Load restaurant records from location Firebase database
+                const snap = await get(ref(dbLocs, 'restaurants'));
+                const rawRestaurants = snap.val() || {};
+
+                // 2. Convert raw records into expected locs format
+                const loadedLocs = Object.values(rawRestaurants).map(r => ({
+                    n: r.storeName || "",
+                    a: r.address || "",
+                    t: parseFloat(r.latitude || "0"),
+                    g: parseFloat(r.longitude || "0")
+                })).filter(l => l.t && l.g);
+
+                // 3. Append the two special locations
+                locs = [
+                    {n:"DPM Office",a:"520 E NW Hwy, Grapevine, TX 76051",t:32.9418,g:-97.0725,special:true},
+                    {n:"Bill's Office",a:"615 Judy Lane, Seagoville, TX 75159",t:32.6394,g:-96.5386,special:true},
+                    ...loadedLocs
+                ];
+
+                // Run migration once if there are legacy layouts
+                await migrateIfNeeded();
+
+                // 4. Build map markers (must happen after locations have loaded)
+                addMarkers();
+
+                // 5. Start ticket listeners
+                onValue(ref(db, 'jobs'), ticketSnap => {
+                    data = ticketSnap.val() || {};
+                    
+                    // Update markers based on ticket status changed
+                    Object.keys(markers).forEach(updateMarker);
+
+                    // 6. Render statistics
+                    updateStats();
+
+                    // 7. Render sidebar
+                    renderList();
+
+                    // Refresh any open popup
+                    Object.values(markers).forEach(mk => {
+                        if(mk.m.isPopupOpen()) mk.m.setPopupContent(buildPanel(mk.l));
+                    });
+
+                    // Refresh mobile modal if open
+                    const modal = document.getElementById('modal');
+                    if(modal.classList.contains('active')) {
+                        const title = modal.querySelector('.panel-title')?.textContent;
+                        const l = title ? locs.find(x => x.n === title) : null;
+                        if(l) document.getElementById('modal-body').innerHTML = buildPanel(l);
+                    }
+                });
+
+            } catch (err) {
+                console.error("Failed to load dynamically from Firebase:", err);
+            }
+        })();
+    </script>
+</body>
+</html>
