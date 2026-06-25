@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
-    <title>DPM AWT Job Tracker v1.3</title>
+    <title>DPM AWT Job Tracker v1.5</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
@@ -243,7 +243,7 @@
     <div class="container">
         <div class="map-section"><div id="map"></div></div>
         <div class="sidebar">
-            <h2>DPM AWT Job Tracker v1.3</h2>
+            <h2>DPM AWT Job Tracker v1.5</h2>
             <div class="stats">
                 <div class="stat" onclick="window.filterByStatus('red')">        <div class="stat-num" style="color:var(--red)"       id="stat-red">0</div>       <div class="stat-label">Not Started</div></div>
                 <div class="stat" onclick="window.filterByStatus('yellow')">     <div class="stat-num" style="color:var(--yellow)"    id="stat-yellow">0</div>    <div class="stat-label">In Progress</div></div>
@@ -770,7 +770,8 @@
                 <div class="active-ticket-label">${closed ? '✓ Closed Ticket' : '🎫 Active Ticket'}${open.ticketNo ? ' #' + open.ticketNo : ''}</div>
                 <div class="form-group">
                     <label class="form-label">Ticket #</label>
-                    <input type="text" class="form-input" id="tk-no-${tkId}" value="${open.ticketNo || ''}" placeholder="e.g. invoice #">
+                    <input type="text" class="form-input" id="tk-no-${tkId}" value="${open.ticketNo || ''}" placeholder="invoice # (overwrites auto code)">
+                    <div style="font-size:10px;color:var(--text2);margin-top:4px;">Auto code is a 3-char ID. Replace it with the invoice number when you have it.</div>
                 </div>
                 <div class="form-group">
                     <label class="form-label">Status</label>
@@ -939,19 +940,28 @@
             }
         };
 
-        // Next ticket number = highest existing numeric ticketNo across all
-        // locations, + 1. Seeds at 1001 when there are none yet. Editable later
-        // (you'll overwrite with the vendor's invoice number), so duplicates
-        // are allowed — this only provides a sensible default on creation.
+        // Auto ticket code: 3-char alphanumeric with AT LEAST ONE LETTER
+        // (e.g. "A7K", "X29", "QM4") so it can never come out all-digits and
+        // be mistaken for one of your numeric invoice numbers (5-6 digits).
+        // Checked for uniqueness so two autos never collide.
         function nextTicketNo() {
-            let max = 1000;
+            const letters = 'ABCDEFGHJKLMNPQRSTUVWXYZ';  // no I,O (ambiguous)
+            const alnum   = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no I,O,0,1
+            const existing = new Set();
             Object.values(data || {}).forEach(loc => {
                 Object.values(loc?.tickets || {}).forEach(t => {
-                    const n = parseInt(t.ticketNo, 10);
-                    if(!isNaN(n) && n > max) max = n;
+                    if(t.ticketNo) existing.add(String(t.ticketNo).toUpperCase());
                 });
             });
-            return String(max + 1);
+            const pick = s => s[Math.floor(Math.random() * s.length)];
+            let code;
+            do {
+                // Build 3 chars, then force one random position to be a letter.
+                const arr = [pick(alnum), pick(alnum), pick(alnum)];
+                arr[Math.floor(Math.random() * 3)] = pick(letters);
+                code = arr.join('');
+            } while(existing.has(code));
+            return code;
         }
 
         window.createTicket = async function(lid) {
@@ -1137,10 +1147,28 @@
         };
 
         // Re-render everything from the current ticket cache.
-        function renderFromData() {
+        // True when the user is actively editing a field inside the open
+        // ticket panel/modal — used to avoid clobbering unsaved input.
+        function isEditingTicket() {
+            const el = document.activeElement;
+            if(!el) return false;
+            const tag = el.tagName;
+            if(tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') return false;
+            // Only count fields that live inside a ticket panel or the modal.
+            return !!el.closest('.panel, #modal');
+        }
+
+        // Re-render everything from current ticket data.
+        // `polite` = true means "don't disturb the user": if they're mid-edit,
+        // skip the panel/modal rebuild (which would discard unsaved typing) and
+        // only refresh the background map markers, stats, and card list.
+        function renderFromData(polite) {
             Object.keys(markers).forEach(updateMarker);
             updateStats();
             renderList();
+
+            if(polite && isEditingTicket()) return; // leave the open editor alone
+
             Object.values(markers).forEach(mk => {
                 if(mk.m.isPopupOpen()) mk.m.setPopupContent(buildPanel(mk.l));
             });
@@ -1152,14 +1180,14 @@
             }
         }
 
-        // Fetch the latest tickets from the API and re-render. Replaces the
-        // old live onValue() listener. Called on load, after every write, and
-        // on a slow interval so other users' changes eventually appear.
-        window.refreshTickets = async function() {
+        // Fetch the latest tickets from the API and re-render. Called on load,
+        // after every write, and on a slow interval. `polite` is passed through
+        // so the periodic poll won't wipe what you're currently typing.
+        window.refreshTickets = async function(polite) {
             try {
                 const snap = await get(ref(db, TICKETS_NODE));
                 data = snap.val() || {};
-                renderFromData();
+                renderFromData(polite);
             } catch(err) {
                 console.error("Failed to refresh tickets:", err);
             }
@@ -1202,7 +1230,7 @@
                 await refreshTickets();
 
                 // 6. Poll for other users' changes every 20s (no live push on API).
-                setInterval(() => { window.refreshTickets(); }, 20000);
+                setInterval(() => { window.refreshTickets(true); }, 20000);
 
             } catch (err) {
                 console.error("Failed to load data from API:", err);
