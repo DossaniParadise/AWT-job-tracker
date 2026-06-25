@@ -41,9 +41,19 @@
         .stat-num { font-size: 24px; font-weight: 700; }
         .stat-label { font-size: 9px; color: var(--text2); text-transform: uppercase; margin-top: 4px; }
 
+        /* ── Controls bar (search + sort) ── */
+        .controls-bar { display: flex; gap: 8px; margin-bottom: 14px; align-items: center; }
+        .search-input { flex: 1; background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; color: var(--text); font-family: 'Space Mono', monospace; font-size: 13px; outline: none; }
+        .search-input:focus { border-color: var(--blue); }
+        .search-input::placeholder { color: var(--text2); }
+        .sort-toggle { display: flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; flex-shrink: 0; }
+        .sort-btn { background: var(--bg2); color: var(--text2); border: none; padding: 9px 12px; font-family: 'Space Mono', monospace; font-size: 12px; font-weight: 700; cursor: pointer; }
+        .sort-btn.active { background: var(--blue); color: #0a0e27; }
+        .no-results { grid-column: 1 / -1; text-align: center; color: var(--text2); font-size: 13px; padding: 30px 0; }
+
         /* ── Location columns ── */
         .location-list { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-        .location-column { display: flex; flex-direction: column; gap: 8px; max-height: calc(100vh - 250px); overflow-y: auto; }
+        .location-column { display: flex; flex-direction: column; gap: 8px; max-height: calc(100vh - 310px); overflow-y: auto; }
         .location-column::-webkit-scrollbar { width: 0; height: 0; }
         .location-column { scrollbar-width: none; -ms-overflow-style: none; }
         .column-header { font-size: 12px; font-weight: 700; color: var(--text2); padding: 8px 0; border-bottom: 2px solid var(--border); margin-bottom: 4px; }
@@ -118,6 +128,10 @@
         /* ── Multi-photo thumbnails ── */
         .note-photo-grid { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
         .note-photo-grid img { width: 72px; height: 72px; object-fit: cover; border-radius: 4px; border: 1px solid var(--border); cursor: pointer; }
+        .pdf-tile { display: inline-flex; align-items: center; justify-content: center; width: 72px; height: 72px; border-radius: 4px; border: 1px solid var(--border); background: var(--bg2); color: var(--blue); font-size: 11px; font-weight: 700; text-decoration: none; }
+        .pdf-tile:hover { border-color: var(--blue); }
+        .invoice-tag { color: var(--yellow); font-weight: 700; font-size: 10px; margin-left: 6px; }
+        .note-invoice { border-color: var(--yellow) !important; }
         .preview-thumb-wrap { position: relative; display: inline-block; }
         .preview-thumb-wrap .thumb-remove { position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; line-height: 16px; text-align: center; background: var(--red); color: #0a0e27; border: none; border-radius: 50%; font-size: 11px; font-weight: 700; cursor: pointer; padding: 0; }
         .preview-grid { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
@@ -156,7 +170,7 @@
         /* ── Mobile modal ── */
         .mobile-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10000; align-items: center; justify-content: center; padding: 20px; }
         .mobile-modal.active { display: flex; }
-        .modal-content { background: var(--bg); border: 2px solid var(--border); border-radius: 12px; max-width: 500px; width: 100%; max-height: 90vh; overflow-y: auto; }
+        .modal-content { background: var(--bg); border: 2px solid var(--border); border-radius: 12px; max-width: 500px; width: 100%; max-height: 90vh; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
         .modal-close { position: sticky; top: 0; background: var(--bg); padding: 12px; border-bottom: 2px solid var(--border); text-align: right; z-index: 1; }
         .modal-close button { background: var(--bg2); color: var(--text); border: 2px solid var(--border); padding: 10px 18px; border-radius: 6px; font-family: 'Space Mono', monospace; font-size: 15px; font-weight: 700; cursor: pointer; }
 
@@ -173,10 +187,25 @@
             .card-addr { font-size: 11px; }
         }
         @media (max-width: 699px) and (orientation: portrait) {
-            .container { display: block; }
+            /* Let the whole page scroll as one surface instead of trapping
+               scroll inside nested overflow containers (the main cause of the
+               "hard to scroll" complaint). */
+            html, body { height: auto; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain; }
+            .container { display: block; height: auto; }
             .map-section { display: none; }
-            .sidebar { width: 100%; min-height: 100vh; overflow-y: visible; }
-            .location-column { max-height: none; overflow-y: visible; }
+            .sidebar { width: 100%; height: auto; min-height: 100vh; overflow: visible; padding: 14px; }
+
+            /* Single column on phones — wider cards, bigger tap targets,
+               and no inner scroll region to fight the page scroll. */
+            .location-list { grid-template-columns: 1fr; gap: 18px; }
+            .location-column { max-height: none; overflow: visible; gap: 10px; }
+            .card { padding: 14px; }
+            .card-name { font-size: 16px; }
+            .card-addr { font-size: 13px; }
+
+            /* Keep search + sort reachable while scrolling. */
+            .controls-bar { position: sticky; top: 0; z-index: 50; background: var(--bg); padding: 8px 0; margin-bottom: 10px; }
+
             .scroll-top-btn { display: block; position: fixed; bottom: 20px; right: 20px; width: 56px; height: 56px; background: var(--blue); color: white; border: none; border-radius: 50%; font-size: 24px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 12px rgba(59,130,246,0.5); z-index: 9999; }
         }
         @media (max-width: 699px) and (orientation: landscape) {
@@ -197,7 +226,14 @@
                 <div class="stat" onclick="window.filterByStatus('yellow')">     <div class="stat-num" style="color:var(--yellow)"    id="stat-yellow">0</div>    <div class="stat-label">In Progress</div></div>
                 <div class="stat" onclick="window.filterByStatus('darkgreen')">  <div class="stat-num" style="color:var(--darkgreen)" id="stat-darkgreen">0</div> <div class="stat-label">Done &amp; Unpaid</div></div>
                 <div class="stat" onclick="window.filterByStatus('green')">      <div class="stat-num" style="color:var(--green)"     id="stat-green">0</div>     <div class="stat-label">Done &amp; Paid</div></div>
-                <div class="stat" onclick="window.filterByStatus('none')">       <div class="stat-num" style="color:var(--text2)"     id="stat-none">0</div>      <div class="stat-label">No Tickets</div></div>
+                <div class="stat" onclick="window.filterByStatus('none')">       <div class="stat-num" style="color:var(--text2)"     id="stat-none">0</div>      <div class="stat-label">Closed</div></div>
+            </div>
+            <div class="controls-bar">
+                <input type="text" id="search-input" class="search-input" placeholder="🔍 Search name, number, or address…" oninput="window.onSearch(this.value)">
+                <div class="sort-toggle">
+                    <button id="sort-number" class="sort-btn active" onclick="window.setSort('number')">By #</button>
+                    <button id="sort-alpha"  class="sort-btn"        onclick="window.setSort('alpha')">A–Z</button>
+                </div>
             </div>
             <div class="location-list" id="list"></div>
         </div>
@@ -314,6 +350,8 @@
         let data = {};
         let markers = {};
         let activeFilter = null;
+        let sortMode = 'number';   // 'number' | 'alpha' — global sort toggle
+        let searchQuery = '';      // search bar text (lowercased)
 
         // ─────────────────────────────────────────
         // Helpers
@@ -342,6 +380,27 @@
             return Object.values(locData.tickets).find(t => !t.archived) || null;
         }
 
+        // All open (non-archived) tickets for a location, oldest first.
+        function getOpenTickets(locData) {
+            if(!locData?.tickets) return [];
+            return Object.entries(locData.tickets)
+                .filter(([id, t]) => !t.archived)
+                .map(([id, t]) => ({ id, ...t }))
+                .sort((a, b) => (a.createdAt||'').localeCompare(b.createdAt||''));
+        }
+
+        // Urgency ranking so the marker can reflect the "worst" open status
+        // when several tickets are open: red > yellow > darkgreen > green > blue.
+        const STATUS_URGENCY = { red:5, yellow:4, darkgreen:3, green:2, blue:1 };
+        function mostUrgentStatus(tickets) {
+            let best = null, bestRank = -1;
+            tickets.forEach(t => {
+                const r = STATUS_URGENCY[t.s || 'blue'] || 0;
+                if(r > bestRank) { bestRank = r; best = t.s || 'blue'; }
+            });
+            return best;
+        }
+
         function getOpenTicketId(locData) {
             if(!locData?.tickets) return null;
             return Object.keys(locData.tickets).find(k => !locData.tickets[k].archived) || null;
@@ -355,8 +414,8 @@
         }
 
         function getMarkerColor(locData) {
-            const open = getOpenTicket(locData);
-            if(open) return statusColor(open.s || 'blue');
+            const opens = getOpenTickets(locData);
+            if(opens.length > 0) return statusColor(mostUrgentStatus(opens) || 'blue');
             if(locData?.tickets && Object.keys(locData.tickets).length > 0) return '#4a5568'; // has history, no open ticket
             return '#74b9ff'; // no tickets at all
         }
@@ -371,27 +430,32 @@
         // Stats
         // ─────────────────────────────────────────
         function getEffectiveStatus(locData) {
-            // Open ticket wins. If no open ticket, use the most recent archived ticket's status.
-            const open = getOpenTicket(locData);
-            if(open) return open.s || 'blue';
+            // Most urgent open ticket wins. If none open, use the most recent archived status.
+            const opens = getOpenTickets(locData);
+            if(opens.length > 0) return mostUrgentStatus(opens) || 'blue';
             const all = getSortedTickets(locData);
             if(all.length > 0) return all[all.length - 1].s || 'blue';
             return 'none';
         }
 
         function updateStats() {
-            const counts = { red:0, yellow:0, darkgreen:0, green:0, none:0 };
+            const counts = { red:0, yellow:0, darkgreen:0, green:0 };
+            let closedTickets = 0;
             locs.forEach(l => {
                 if(l.special) return;
-                const s = getEffectiveStatus(data[locId(l)]);
-                if(s === 'blue' || s === 'none') counts.none++;
-                else counts[s] = (counts[s] || 0) + 1;
+                const d = data[locId(l)];
+                // The four active boxes count locations by their open status.
+                const s = getEffectiveStatus(d);
+                if(s !== 'blue' && s !== 'none' && counts[s] !== undefined) counts[s]++;
+                // "Closed" counts archived tickets across all stores.
+                const all = getSortedTickets(d);
+                closedTickets += all.filter(t => t.archived).length;
             });
             document.getElementById('stat-red').textContent       = counts.red;
             document.getElementById('stat-yellow').textContent    = counts.yellow;
             document.getElementById('stat-darkgreen').textContent = counts.darkgreen;
             document.getElementById('stat-green').textContent     = counts.green;
-            document.getElementById('stat-none').textContent      = counts.none;
+            document.getElementById('stat-none').textContent      = closedTickets;
         }
 
         // ─────────────────────────────────────────
@@ -400,17 +464,14 @@
         window.filterByStatus = function(status) {
             if(activeFilter === status) {
                 activeFilter = null;
-                document.querySelectorAll('.card').forEach(c => c.style.display = '');
                 document.querySelectorAll('.stat').forEach(s => s.style.opacity = '1');
-                return;
+            } else {
+                activeFilter = status;
+                document.querySelectorAll('.stat').forEach(s => s.style.opacity = '0.3');
+                const idx = {red:0, yellow:1, darkgreen:2, green:3, none:4};
+                if(idx[status] !== undefined) document.querySelectorAll('.stat')[idx[status]].style.opacity = '1';
             }
-            activeFilter = status;
-            document.querySelectorAll('.card').forEach(card => {
-                card.style.display = (card.dataset.filterStatus === status) ? '' : 'none';
-            });
-            document.querySelectorAll('.stat').forEach(s => s.style.opacity = '0.3');
-            const idx = {red:0, yellow:1, darkgreen:2, green:3, none:4};
-            if(idx[status] !== undefined) document.querySelectorAll('.stat')[idx[status]].style.opacity = '1';
+            applyCardVisibility();
         };
 
         // ─────────────────────────────────────────
@@ -428,17 +489,22 @@
                 }
             });
 
-            ff.sort((a,b) => {
+            // Alphabetical comparator (ignores chain prefix + leading "The ")
+            const alphaCmp = (a, b) => {
                 const clean = n => { let x=n.replace('Burger King ','').replace('Subway ',''); if(x.startsWith('The ')) x=x.substring(4); return x; };
                 return clean(a.n).localeCompare(clean(b.n));
-            });
-            cs.sort((a,b) => {
-                const gn = n => { const m=n.match(/Paradise QS #(\d+)/); return m?parseInt(m[1]):null; };
-                const an=gn(a.n), bn=gn(b.n);
-                if(an!==null && bn!==null) return an-bn;
-                if(an!==null) return -1; if(bn!==null) return 1;
-                return a.n.localeCompare(b.n);
-            });
+            };
+            // By-number comparator (uses store number when present; falls back to alpha)
+            const numCmp = (a, b) => {
+                const gn = n => { const m = n.match(/#(\d+)/); return m ? parseInt(m[1]) : null; };
+                const an = gn(a.n), bn = gn(b.n);
+                if(an !== null && bn !== null) return an - bn;
+                if(an !== null) return -1; if(bn !== null) return 1;
+                return alphaCmp(a, b);
+            };
+            const cmp = (sortMode === 'alpha') ? alphaCmp : numCmp;
+            ff.sort(cmp);
+            cs.sort(cmp);
 
             const mkCard = l => {
                 const lid = locId(l);
@@ -446,27 +512,44 @@
                 c.className = 'card';
 
                 if(l.special) {
+                    c.dataset.special = '1';
                     c.innerHTML = `<div class="card-name" style="color:var(--purple);">📍 ${l.n}</div><div class="card-addr" style="cursor:pointer;text-decoration:underline;" onclick="window.open('https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(l.a)}','_blank')">${l.a}</div>`;
+                    c.dataset.search = `${l.n} ${l.a}`.toLowerCase();
                     c.style.borderColor = 'var(--purple)';
                     c.onclick = () => map.setView([l.t, l.g], 15);
                     return c;
                 }
 
                 const d = data[lid];
-                const open = getOpenTicket(d);
+                const opens = getOpenTickets(d);
                 const all = getSortedTickets(d);
                 const archivedCount = all.filter(t => t.archived).length;
 
-                // Filter status: open ticket wins, otherwise fall back to most recent archived
-                const effectiveStatus = getEffectiveStatus(d);
-                c.dataset.filterStatus = (effectiveStatus === 'blue' || effectiveStatus === 'none') ? 'none' : effectiveStatus;
+                // Filter status reflects the most urgent OPEN ticket (the four
+                // active boxes). Cards with no open ticket carry no status.
+                const urgentOpen = opens.length ? mostUrgentStatus(opens) : null;
+                c.dataset.filterStatus = (urgentOpen && urgentOpen !== 'blue') ? urgentOpen : '';
+                // Separate flag for the "Closed" box: does this store have any
+                // archived (closed) tickets?
+                c.dataset.hasClosed = archivedCount > 0 ? '1' : '';
 
-                // Card border reflects open ticket status
-                c.style.borderColor = open ? statusColor(open.s || 'blue') : 'var(--border)';
+                // Card border reflects the most urgent open ticket's status
+                const urgent = urgentOpen;
+                c.style.borderColor = urgent ? statusColor(urgent) : 'var(--border)';
+
+                // Search index: name + number + address (lowercased) for the search bar
+                c.dataset.search = `${l.n} ${l.a}`.toLowerCase();
 
                 // Badge row
                 let metaHtml = '';
-                if(open) {
+                if(opens.length > 1) {
+                    // Multiple open tickets → show a count badge in the urgent color
+                    metaHtml = `<span class="badge-status status-${urgent}">${opens.length} open</span>`;
+                    if(archivedCount > 0) {
+                        metaHtml += `<span class="ticket-badge badge-none" style="font-size:10px;">+${archivedCount} archived</span>`;
+                    }
+                } else if(opens.length === 1) {
+                    const open = opens[0];
                     metaHtml = `<span class="badge-status status-${open.s}">${statusLabel(open.s)}</span>`;
                     if(open.ticketNo) {
                         metaHtml += `<span class="ticket-badge badge-open" style="font-size:10px;">#${open.ticketNo}</span>`;
@@ -510,13 +593,53 @@
             list.appendChild(c1);
             list.appendChild(c2);
 
-            // Reapply active filter
-            if(activeFilter) {
-                document.querySelectorAll('.card').forEach(card => {
-                    card.style.display = (card.dataset.filterStatus === activeFilter) ? '' : 'none';
+            // Apply current search + status-filter visibility
+            applyCardVisibility();
+        }
+
+        // Show/hide cards based on the active status filter AND the search query.
+        function applyCardVisibility() {
+            let anyVisible = false;
+            document.querySelectorAll('.card').forEach(card => {
+                const isSpecial = card.dataset.special === '1';
+                let matchesFilter;
+                if(!activeFilter) {
+                    matchesFilter = true;
+                } else if(activeFilter === 'none') {
+                    // "Closed" box → stores that have at least one closed ticket
+                    matchesFilter = card.dataset.hasClosed === '1';
+                } else {
+                    matchesFilter = card.dataset.filterStatus === activeFilter;
+                }
+                const matchesSearch = !searchQuery || (card.dataset.search || '').includes(searchQuery);
+                // Special (office) cards only show when no status filter is active.
+                const show = matchesSearch && (isSpecial ? !activeFilter : matchesFilter);
+                card.style.display = show ? '' : 'none';
+                if(show && !isSpecial) anyVisible = true;
+            });
+
+            document.querySelectorAll('.no-results').forEach(n => n.remove());
+            if(searchQuery && !anyVisible) {
+                document.querySelectorAll('.location-column').forEach(col => {
+                    const msg = document.createElement('div');
+                    msg.className = 'no-results';
+                    msg.textContent = 'No matches';
+                    col.appendChild(msg);
                 });
             }
         }
+
+        window.setSort = function(mode) {
+            sortMode = mode;
+            document.getElementById('sort-number')?.classList.toggle('active', mode === 'number');
+            document.getElementById('sort-alpha')?.classList.toggle('active', mode === 'alpha');
+            renderList();
+        };
+
+        window.onSearch = function(val) {
+            searchQuery = (val || '').toLowerCase().trim();
+            applyCardVisibility();
+        };
 
         // ─────────────────────────────────────────
         // Build panel HTML
@@ -527,8 +650,6 @@
             const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(l.a)}`;
             const all = getSortedTickets(d);
             const archived = all.filter(t => t.archived);
-            const open = all.find(t => !t.archived) || null;
-            const openId = open ? open.id : null;
 
             let html = `<div class="panel">
                 <div class="panel-title">${l.n}</div>
@@ -546,12 +667,13 @@
 
                     let notesHtml = notes.map(n => {
                         const photos = notePhotos(n);
+                        const isInvoice = !!n.invoice;
                         const photoHtml = photos.length
-                            ? `<div class="note-photo-grid">${photos.map(u => `<img src="${u}" onclick="window.open('${u}','_blank')" title="Click to open full size">`).join('')}</div>`
+                            ? `<div class="note-photo-grid">${photos.map(u => photoThumb(u)).join('')}</div>`
                             : '';
                         return `
-                        <div class="archived-note">
-                            <div class="archived-note-date">${new Date(n.t).toLocaleString()}</div>
+                        <div class="archived-note${isInvoice ? ' note-invoice' : ''}">
+                            <div class="archived-note-date">${new Date(n.t).toLocaleString()}${isInvoice ? ' <span class="invoice-tag">🧾 Invoice</span>' : ''}</div>
                             ${n.n ? `<div class="archived-note-text">${n.n}</div>` : ''}
                             ${photoHtml}
                         </div>`;
@@ -583,78 +705,97 @@
                 html += `</div><hr class="section-divider">`;
             }
 
-            // ── Active ticket ──
-            if(open) {
-                const notes = open.notes || [];
-                const notesListHtml = notes.map((n, i) => {
-                    const photos = notePhotos(n);
-                    const photoHtml = photos.length
-                        ? `<div class="note-photo-grid">${photos.map(u => `<img src="${u}" onclick="window.open('${u}','_blank')" title="Click for full size">`).join('')}</div>`
-                        : '';
-                    return `
-                    <div class="note-item draggable" draggable="true" data-note-index="${i}"
-                         ondragstart="window.noteDragStart(event,'${lid}','${openId}',${i})"
-                         ondragover="window.noteDragOver(event)"
-                         ondragleave="window.noteDragLeave(event)"
-                         ondrop="window.noteDrop(event,'${lid}','${openId}',${i})"
-                         ondragend="window.noteDragEnd(event)">
-                        <span class="note-drag-handle" title="Drag to reorder">⠿</span>
-                        <div class="note-item-content">
-                            <div class="note-item-date">${new Date(n.t).toLocaleString()}</div>
-                            ${n.n ? `<div class="note-item-text">${n.n}</div>` : ''}
-                            ${photoHtml}
-                        </div>
-                    </div>`;
-                }).join('');
+            // ── Active (open) tickets — one editor each ──
+            const opens = getOpenTickets(d);
+            opens.forEach(t => { html += buildActiveTicket(lid, t); });
 
-                html += `<div class="active-ticket-section">
-                    <div class="active-ticket-label">🎫 Active Ticket</div>
-                    <div class="form-group">
-                        <label class="form-label">Ticket #</label>
-                        <input type="text" class="form-input" id="tk-no-${lid}" value="${open.ticketNo || ''}" placeholder="e.g. invoice #">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Status</label>
-                        <select class="form-select" id="tk-s-${lid}" onchange="window.previewStatus('${lid}')">
-                            <option value="blue"      ${open.s==='blue'?      'selected':''}>No Issues</option>
-                            <option value="red"       ${open.s==='red'?       'selected':''}>Not Started</option>
-                            <option value="yellow"    ${open.s==='yellow'?    'selected':''}>In Progress</option>
-                            <option value="darkgreen" ${open.s==='darkgreen'? 'selected':''}>Done &amp; Unpaid</option>
-                            <option value="green"     ${open.s==='green'?     'selected':''}>Done &amp; Paid</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Visit Date</label>
-                        <input type="date" class="form-input" id="tk-v-${lid}" value="${open.v || ''}">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Issue Description</label>
-                        <textarea class="form-textarea" id="tk-i-${lid}">${open.issue || ''}</textarea>
-                    </div>
-                    ${notesListHtml ? `<div class="form-label" style="margin-bottom:6px;">Notes</div><div class="notes-list">${notesListHtml}</div>` : ''}
-                    <div class="add-note-area">
-                        <div class="add-note-label">Add Note</div>
-                        <textarea class="add-note-textarea" id="tk-n-${lid}" placeholder="Type a note..."></textarea>
-                        <div class="add-note-photo-row">
-                            <input type="file" accept="image/*" multiple id="tk-f-${lid}" style="display:none" onchange="window.handleNotePhotos('${lid}','${openId}',this)">
-                            <button class="add-note-photo-btn" onclick="document.getElementById('tk-f-${lid}').click()">📎 Attach Photos (up to 5)</button>
-                            <span class="upload-status" id="tk-upload-${lid}"></span>
-                            <input type="hidden" id="tk-p-${lid}" value="">
-                        </div>
-                        <div class="preview-grid" id="tk-previews-${lid}"></div>
-                    </div>
-                    <div class="btn-group" style="margin-top:10px;">
-                        <button class="btn btn-primary"   onclick="window.saveTicket('${lid}','${openId}')">💾 Save</button>
-                        <button class="btn btn-success"   onclick="window.archiveTicket('${lid}','${openId}')">✓ Close Ticket</button>
-                        <button class="btn btn-danger"    onclick="window.deleteTicket('${lid}','${openId}')">🗑</button>
-                    </div>
-                </div>`;
-            } else {
-                html += `<button class="btn-new-ticket" onclick="window.createTicket('${lid}')">＋ Open New Ticket</button>`;
-            }
+            // ── Always allow opening another ticket ──
+            html += `<button class="btn-new-ticket" onclick="window.createTicket('${lid}')">＋ Open New Ticket</button>`;
 
             html += `</div>`;
             return html;
+        }
+
+        // Build one open-ticket editor. Element IDs are scoped by ticket id
+        // (tk-<field>-<tkId>) so multiple open tickets never collide.
+        function buildActiveTicket(lid, open) {
+            const tkId = open.id;
+            const notes = open.notes || [];
+            const notesListHtml = notes.map((n, i) => {
+                const photos = notePhotos(n);
+                const isInvoice = !!n.invoice;
+                const photoHtml = photos.length
+                    ? `<div class="note-photo-grid">${photos.map(u => photoThumb(u)).join('')}</div>`
+                    : '';
+                return `
+                <div class="note-item draggable${isInvoice ? ' note-invoice' : ''}" draggable="true" data-note-index="${i}"
+                     ondragstart="window.noteDragStart(event,'${lid}','${tkId}',${i})"
+                     ondragover="window.noteDragOver(event)"
+                     ondragleave="window.noteDragLeave(event)"
+                     ondrop="window.noteDrop(event,'${lid}','${tkId}',${i})"
+                     ondragend="window.noteDragEnd(event)">
+                    <span class="note-drag-handle" title="Drag to reorder">⠿</span>
+                    <div class="note-item-content">
+                        <div class="note-item-date">${new Date(n.t).toLocaleString()}${isInvoice ? ' <span class="invoice-tag">🧾 Invoice</span>' : ''}</div>
+                        ${n.n ? `<div class="note-item-text">${n.n}</div>` : ''}
+                        ${photoHtml}
+                    </div>
+                </div>`;
+            }).join('');
+
+            return `<div class="active-ticket-section">
+                <div class="active-ticket-label">🎫 Active Ticket${open.ticketNo ? ' #' + open.ticketNo : ''}</div>
+                <div class="form-group">
+                    <label class="form-label">Ticket #</label>
+                    <input type="text" class="form-input" id="tk-no-${tkId}" value="${open.ticketNo || ''}" placeholder="e.g. invoice #">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Status</label>
+                    <select class="form-select" id="tk-s-${tkId}" onchange="window.previewStatus('${lid}')">
+                        <option value="blue"      ${open.s==='blue'?      'selected':''}>No Issues</option>
+                        <option value="red"       ${open.s==='red'?       'selected':''}>Not Started</option>
+                        <option value="yellow"    ${open.s==='yellow'?    'selected':''}>In Progress</option>
+                        <option value="darkgreen" ${open.s==='darkgreen'? 'selected':''}>Done &amp; Unpaid</option>
+                        <option value="green"     ${open.s==='green'?     'selected':''}>Done &amp; Paid</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Visit Date</label>
+                    <input type="date" class="form-input" id="tk-v-${tkId}" value="${open.v || ''}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Issue Description</label>
+                    <textarea class="form-textarea" id="tk-i-${tkId}">${open.issue || ''}</textarea>
+                </div>
+                ${notesListHtml ? `<div class="form-label" style="margin-bottom:6px;">Notes</div><div class="notes-list">${notesListHtml}</div>` : ''}
+                <div class="add-note-area">
+                    <div class="add-note-label">Add Note</div>
+                    <textarea class="add-note-textarea" id="tk-n-${tkId}" placeholder="Type a note..."></textarea>
+                    <div class="add-note-photo-row">
+                        <input type="file" accept="image/*" multiple id="tk-f-${tkId}" style="display:none" onchange="window.handleNotePhotos('${lid}','${tkId}',this)">
+                        <button class="add-note-photo-btn" onclick="document.getElementById('tk-f-${tkId}').click()">📎 Attach Photos (up to 5)</button>
+                        <input type="file" accept="image/*" id="tk-inv-${tkId}" style="display:none" onchange="window.handleInvoice('${lid}','${tkId}',this)">
+                        <button class="add-note-photo-btn" onclick="document.getElementById('tk-inv-${tkId}').click()">🧾 Add Invoice</button>
+                        <span class="upload-status" id="tk-upload-${tkId}"></span>
+                        <input type="hidden" id="tk-p-${tkId}" value="">
+                    </div>
+                    <div class="preview-grid" id="tk-previews-${tkId}"></div>
+                </div>
+                <div class="btn-group" style="margin-top:10px;">
+                    <button class="btn btn-primary"   onclick="window.saveTicket('${lid}','${tkId}')">💾 Save</button>
+                    <button class="btn btn-success"   onclick="window.archiveTicket('${lid}','${tkId}')">✓ Close Ticket</button>
+                    <button class="btn btn-danger"    onclick="window.deleteTicket('${lid}','${tkId}')">🗑</button>
+                </div>
+            </div>`;
+        }
+
+        // Render a photo thumbnail, or a PDF link tile for PDF invoices.
+        function photoThumb(u) {
+            const isPdf = /\.pdf($|\?)/i.test(u);
+            if(isPdf) {
+                return `<a class="pdf-tile" href="${u}" target="_blank" title="Open PDF">📄 PDF</a>`;
+            }
+            return `<img src="${u}" onclick="window.open('${u}','_blank')" title="Click to open full size">`;
         }
 
         // ─────────────────────────────────────────
@@ -686,8 +827,17 @@
         // Ticket actions
         // ─────────────────────────────────────────
         window.previewStatus = function(lid) {
-            const el = document.getElementById(`tk-s-${lid}`);
-            if(el && markers[lid]) markers[lid].m.setStyle({ fillColor: statusColor(el.value) });
+            // Reflect the most urgent status across all open-ticket selects in the panel.
+            if(!markers[lid]) return;
+            const opens = getOpenTickets(data[lid]);
+            let best = null, bestRank = -1;
+            opens.forEach(t => {
+                const el = document.getElementById(`tk-s-${t.id}`);
+                const v = el ? el.value : (t.s || 'blue');
+                const r = STATUS_URGENCY[v] || 0;
+                if(r > bestRank) { bestRank = r; best = v; }
+            });
+            if(best) markers[lid].m.setStyle({ fillColor: statusColor(best) });
         };
 
         window.saveTicket = async function(lid, tkId) {
@@ -695,8 +845,8 @@
                 const existing = data[lid]?.tickets?.[tkId] || {};
                 const notes = [...(existing.notes || [])];
 
-                const noteText = document.getElementById(`tk-n-${lid}`)?.value.trim() || '';
-                const photoRaw = document.getElementById(`tk-p-${lid}`)?.value || '';
+                const noteText = document.getElementById(`tk-n-${tkId}`)?.value.trim() || '';
+                const photoRaw = document.getElementById(`tk-p-${tkId}`)?.value || '';
                 let photoUrls = [];
                 try { photoUrls = photoRaw ? JSON.parse(photoRaw) : []; } catch(e) { photoUrls = []; }
                 if(noteText || photoUrls.length) {
@@ -706,10 +856,10 @@
                 }
                 const updated = {
                     ...existing,
-                    ticketNo: document.getElementById(`tk-no-${lid}`)?.value ?? existing.ticketNo ?? '',
-                    s:     document.getElementById(`tk-s-${lid}`).value,
-                    v:     document.getElementById(`tk-v-${lid}`).value,
-                    issue: document.getElementById(`tk-i-${lid}`).value,
+                    ticketNo: document.getElementById(`tk-no-${tkId}`)?.value ?? existing.ticketNo ?? '',
+                    s:     document.getElementById(`tk-s-${tkId}`).value,
+                    v:     document.getElementById(`tk-v-${tkId}`).value,
+                    issue: document.getElementById(`tk-i-${tkId}`).value,
                     notes
                 };
 
@@ -726,8 +876,8 @@
             try {
                 const existing = data[lid]?.tickets?.[tkId] || {};
                 const notes = [...(existing.notes || [])];
-                const noteText = document.getElementById(`tk-n-${lid}`)?.value.trim() || '';
-                const photoRaw = document.getElementById(`tk-p-${lid}`)?.value || '';
+                const noteText = document.getElementById(`tk-n-${tkId}`)?.value.trim() || '';
+                const photoRaw = document.getElementById(`tk-p-${tkId}`)?.value || '';
                 let photoUrls = [];
                 try { photoUrls = photoRaw ? JSON.parse(photoRaw) : []; } catch(e) { photoUrls = []; }
                 if(noteText || photoUrls.length) {
@@ -737,10 +887,10 @@
                 }
                 const updated = {
                     ...existing,
-                    ticketNo:   document.getElementById(`tk-no-${lid}`)?.value ?? existing.ticketNo ?? '',
-                    s:          document.getElementById(`tk-s-${lid}`)?.value  || existing.s,
-                    v:          document.getElementById(`tk-v-${lid}`)?.value  || existing.v,
-                    issue:      document.getElementById(`tk-i-${lid}`)?.value  || existing.issue,
+                    ticketNo:   document.getElementById(`tk-no-${tkId}`)?.value ?? existing.ticketNo ?? '',
+                    s:          document.getElementById(`tk-s-${tkId}`)?.value  || existing.s,
+                    v:          document.getElementById(`tk-v-${tkId}`)?.value  || existing.v,
+                    issue:      document.getElementById(`tk-i-${tkId}`)?.value  || existing.issue,
                     notes,
                     archived:   true,
                     archivedAt: new Date().toISOString()
@@ -798,9 +948,8 @@
         const MAX_PHOTOS = 5;
 
         window.handleNotePhotos = async function(lid, tkId, inputEl) {
-            const hiddenEl  = document.getElementById(`tk-p-${lid}`);
-            const statusEl  = document.getElementById(`tk-upload-${lid}`);
-            const gridEl    = document.getElementById(`tk-previews-${lid}`);
+            const hiddenEl  = document.getElementById(`tk-p-${tkId}`);
+            const statusEl  = document.getElementById(`tk-upload-${tkId}`);
 
             let current = [];
             try { current = hiddenEl.value ? JSON.parse(hiddenEl.value) : []; } catch(e) { current = []; }
@@ -830,7 +979,7 @@
                 current = [...current, ...urls];
                 hiddenEl.value = JSON.stringify(current);
                 statusEl.textContent = `✓ ${current.length} ready`;
-                renderPreviews(lid);
+                renderPreviews(tkId);
             } catch(err) {
                 statusEl.textContent = '';
                 alert('Photo upload failed: ' + err.message);
@@ -839,28 +988,64 @@
             }
         };
 
-        function renderPreviews(lid) {
-            const hiddenEl = document.getElementById(`tk-p-${lid}`);
-            const gridEl   = document.getElementById(`tk-previews-${lid}`);
+        function renderPreviews(tkId) {
+            const hiddenEl = document.getElementById(`tk-p-${tkId}`);
+            const gridEl   = document.getElementById(`tk-previews-${tkId}`);
             if(!gridEl) return;
             let urls = [];
             try { urls = hiddenEl.value ? JSON.parse(hiddenEl.value) : []; } catch(e) { urls = []; }
             gridEl.innerHTML = urls.map((u, i) => `
                 <span class="preview-thumb-wrap">
                     <img src="${u}" class="note-photo-preview" onclick="window.open('${u}','_blank')">
-                    <button class="thumb-remove" title="Remove" onclick="window.removeNotePhoto('${lid}',${i})">✕</button>
+                    <button class="thumb-remove" title="Remove" onclick="window.removeNotePhoto('${tkId}',${i})">✕</button>
                 </span>`).join('');
         }
 
-        window.removeNotePhoto = function(lid, idx) {
-            const hiddenEl = document.getElementById(`tk-p-${lid}`);
+        window.removeNotePhoto = function(tkId, idx) {
+            const hiddenEl = document.getElementById(`tk-p-${tkId}`);
             let urls = [];
             try { urls = hiddenEl.value ? JSON.parse(hiddenEl.value) : []; } catch(e) { urls = []; }
             urls.splice(idx, 1);
             hiddenEl.value = urls.length ? JSON.stringify(urls) : '';
-            const statusEl = document.getElementById(`tk-upload-${lid}`);
+            const statusEl = document.getElementById(`tk-upload-${tkId}`);
             if(statusEl) statusEl.textContent = urls.length ? `✓ ${urls.length} ready` : '';
-            renderPreviews(lid);
+            renderPreviews(tkId);
+        };
+
+        // ─────────────────────────────────────────
+        // Invoice upload — image only (a screenshot of the invoice). Saves
+        // immediately as its own note flagged invoice:true (🧾 label).
+        // ─────────────────────────────────────────
+        window.handleInvoice = async function(lid, tkId, inputEl) {
+            const file = inputEl.files?.[0];
+            if(!file) return;
+            if(!file.type.startsWith('image/')) { alert('Invoice must be an image (a screenshot is fine).'); inputEl.value=''; return; }
+
+            const statusEl = document.getElementById(`tk-upload-${tkId}`);
+            if(statusEl) statusEl.textContent = 'Uploading invoice…';
+
+            try {
+                const formData = new FormData();
+                formData.append('image', file);
+                const res  = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, { method:'POST', body:formData });
+                const json = await res.json();
+                if(!json.success) throw new Error(json.error?.message || 'Upload failed');
+                const url = json.data.url;
+
+                // Append as a dedicated invoice note, preserving existing notes.
+                const existing = data[lid]?.tickets?.[tkId] || {};
+                const notes = [...(existing.notes || [])];
+                notes.push({ n: 'Invoice', t: new Date().toISOString(), photoUrls: [url], invoice: true });
+                await set(ref(db, `awtTickets/${lid}/tickets/${tkId}/notes`), notes);
+
+                if(statusEl) statusEl.textContent = '✓ Invoice added';
+                renderFromData();
+            } catch(err) {
+                if(statusEl) statusEl.textContent = '';
+                alert('Invoice upload failed: ' + err.message);
+            } finally {
+                inputEl.value = '';
+            }
         };
 
         // ─────────────────────────────────────────
@@ -935,6 +1120,8 @@
         };
 
         window.scrollToTop = function() {
+            // On mobile the whole page scrolls; on desktop the sidebar does.
+            window.scrollTo({ top:0, behavior:'smooth' });
             document.querySelector('.sidebar')?.scrollTo({ top:0, behavior:'smooth' });
         };
 
