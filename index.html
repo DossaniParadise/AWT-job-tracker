@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
-    <title>DPM AWT Job Tracker v1.5</title>
+    <title>DPM AWT Job Tracker v1.6</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
@@ -243,12 +243,12 @@
     <div class="container">
         <div class="map-section"><div id="map"></div></div>
         <div class="sidebar">
-            <h2>DPM AWT Job Tracker v1.5</h2>
+            <h2>DPM AWT Job Tracker v1.6</h2>
             <div class="stats">
                 <div class="stat" onclick="window.filterByStatus('red')">        <div class="stat-num" style="color:var(--red)"       id="stat-red">0</div>       <div class="stat-label">Not Started</div></div>
                 <div class="stat" onclick="window.filterByStatus('yellow')">     <div class="stat-num" style="color:var(--yellow)"    id="stat-yellow">0</div>    <div class="stat-label">In Progress</div></div>
                 <div class="stat" onclick="window.filterByStatus('darkgreen')">  <div class="stat-num" style="color:var(--darkgreen)" id="stat-darkgreen">0</div> <div class="stat-label">Done &amp; Unpaid</div></div>
-                <div class="stat" onclick="window.filterByStatus('none')">       <div class="stat-num" style="color:var(--green)"     id="stat-none">0</div>      <div class="stat-label">Closed</div></div>
+                <div class="stat" onclick="window.filterByStatus('none')">       <div class="stat-num" style="color:var(--green)"     id="stat-none">0</div>      <div class="stat-label">Paid</div></div>
             </div>
             <div class="controls-bar">
                 <input type="text" id="search-input" class="search-input" placeholder="🔍 Search name, number, or address…" oninput="window.onSearch(this.value)">
@@ -386,7 +386,7 @@
         // "green" now means CLOSED (it absorbed the old "Done & Paid").
         // There is no separate archived flag — a ticket is closed iff s==='green'.
         function statusLabel(s) {
-            return s==='red'?'Not Started':s==='yellow'?'In Progress':s==='darkgreen'?'Done & Unpaid':s==='green'?'Closed':'No Issues';
+            return s==='red'?'Not Started':s==='yellow'?'In Progress':s==='darkgreen'?'Done & Unpaid':s==='green'?'Paid':'No Issues';
         }
 
         function statusColor(s) {
@@ -595,7 +595,7 @@
                     // Multiple open tickets → show a count badge in the urgent color
                     metaHtml = `<span class="badge-status status-${urgent}">${opens.length} open</span>`;
                     if(closedCount > 0) {
-                        metaHtml += `<span class="ticket-badge badge-none" style="font-size:10px;">+${closedCount} closed</span>`;
+                        metaHtml += `<span class="ticket-badge badge-none" style="font-size:10px;">+${closedCount} paid</span>`;
                     }
                 } else if(opens.length === 1) {
                     const open = opens[0];
@@ -604,10 +604,10 @@
                         metaHtml += `<span class="ticket-badge badge-open" style="font-size:10px;">#${open.ticketNo}</span>`;
                     }
                     if(closedCount > 0) {
-                        metaHtml += `<span class="ticket-badge badge-none" style="font-size:10px;">+${closedCount} closed</span>`;
+                        metaHtml += `<span class="ticket-badge badge-none" style="font-size:10px;">+${closedCount} paid</span>`;
                     }
                 } else if(closedCount > 0) {
-                    metaHtml = `<span class="badge-status status-green">Closed</span>`;
+                    metaHtml = `<span class="badge-status status-green">Paid</span>`;
                     if(closedCount > 1) {
                         metaHtml += `<span class="ticket-badge badge-none" style="font-size:10px;">${closedCount} tickets</span>`;
                     }
@@ -718,13 +718,13 @@
             if(closed.length > 0) {
                 html += `<hr class="section-divider">
                     <div class="history-section">
-                        <div class="history-header">✓ Closed Tickets (${closed.length})</div>`;
+                        <div class="history-header">✓ Paid Tickets (${closed.length})</div>`;
                 closed.forEach(t => {
                     const displayDate = t.v || (t.createdAt ? new Date(t.createdAt).toLocaleDateString() : 'No date');
                     html += `<div class="closed-ticket">
                         <div class="closed-ticket-header" onclick="this.nextElementSibling.classList.toggle('open')">
                             <span class="closed-ticket-label">Ticket ${t.ticketNo ? '#' + t.ticketNo : ''} — ${displayDate}</span>
-                            <span class="badge-status status-green" style="font-size:10px;">Closed</span>
+                            <span class="badge-status status-green" style="font-size:10px;">Paid</span>
                         </div>
                         <div class="closed-ticket-body">
                             ${buildActiveTicket(lid, t)}
@@ -767,7 +767,7 @@
 
             const closed = isClosed(open);
             return `<div class="active-ticket-section${closed ? ' closed-editor' : ''}">
-                <div class="active-ticket-label">${closed ? '✓ Closed Ticket' : '🎫 Active Ticket'}${open.ticketNo ? ' #' + open.ticketNo : ''}</div>
+                <div class="active-ticket-label">${closed ? '✓ Paid Ticket' : '🎫 Active Ticket'}${open.ticketNo ? ' #' + open.ticketNo : ''}</div>
                 <div class="form-group">
                     <label class="form-label">Ticket #</label>
                     <input type="text" class="form-input" id="tk-no-${tkId}" value="${open.ticketNo || ''}" placeholder="invoice # (overwrites auto code)">
@@ -779,7 +779,7 @@
                         <option value="red"       ${open.s==='red'?       'selected':''}>Not Started</option>
                         <option value="yellow"    ${open.s==='yellow'?    'selected':''}>In Progress</option>
                         <option value="darkgreen" ${open.s==='darkgreen'? 'selected':''}>Done &amp; Unpaid</option>
-                        <option value="green"     ${open.s==='green'?     'selected':''}>Closed</option>
+                        <option value="green"     ${open.s==='green'?     'selected':''}>Paid</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -808,7 +808,7 @@
                     <button class="btn btn-primary"   onclick="window.saveTicket('${lid}','${tkId}')">💾 Save</button>
                     ${closed
                         ? `<button class="btn btn-secondary" onclick="window.setTicketStatus('${lid}','${tkId}','red')">↩ Reopen</button>`
-                        : `<button class="btn btn-success" onclick="window.setTicketStatus('${lid}','${tkId}','green')">✓ Mark Closed</button>`}
+                        : `<button class="btn btn-success" onclick="window.setTicketStatus('${lid}','${tkId}','green')">✓ Mark Paid</button>`}
                     <button class="btn btn-danger"    onclick="window.deleteTicket('${lid}','${tkId}')">🗑</button>
                 </div>
             </div>`;
@@ -896,7 +896,7 @@
             }
         };
 
-        // Quick status shortcut used by the "Mark Closed" / "Reopen" buttons.
+        // Quick status shortcut used by the "Mark Paid" / "Reopen" buttons.
         // Saves any pending edits in the editor first, then sets the status.
         window.setTicketStatus = async function(lid, tkId, newStatus) {
             try {
