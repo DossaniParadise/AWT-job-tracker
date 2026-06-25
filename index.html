@@ -115,6 +115,25 @@
         .note-photo-clear { font-size: 11px; color: var(--red); cursor: pointer; background: none; border: none; font-family: 'Space Mono', monospace; }
         .upload-status { font-size: 11px; color: var(--text2); }
 
+        /* ── Multi-photo thumbnails ── */
+        .note-photo-grid { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+        .note-photo-grid img { width: 72px; height: 72px; object-fit: cover; border-radius: 4px; border: 1px solid var(--border); cursor: pointer; }
+        .preview-thumb-wrap { position: relative; display: inline-block; }
+        .preview-thumb-wrap .thumb-remove { position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; line-height: 16px; text-align: center; background: var(--red); color: #0a0e27; border: none; border-radius: 50%; font-size: 11px; font-weight: 700; cursor: pointer; padding: 0; }
+        .preview-grid { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+
+        /* ── Draggable notes ── */
+        .note-item.draggable { cursor: grab; display: flex; gap: 8px; align-items: flex-start; }
+        .note-item.draggable:active { cursor: grabbing; }
+        .note-drag-handle { color: var(--text2); font-size: 14px; padding-top: 2px; user-select: none; flex-shrink: 0; }
+        .note-item-content { flex: 1; min-width: 0; }
+        .note-item.drag-over { border-color: var(--blue); box-shadow: 0 0 0 1px var(--blue); }
+        .note-item.dragging { opacity: 0.4; }
+
+        /* ── Archived ticket inline status edit ── */
+        .archived-status-edit { margin-top: 8px; }
+        .archived-status-edit .form-select { font-size: 12px; padding: 6px 8px; }
+
         /* ── Forms ── */
         .form-group { margin-bottom: 12px; }
         .form-label { font-size: 12px; font-weight: 700; color: var(--text2); margin-bottom: 4px; display: block; }
@@ -195,38 +214,87 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script type="module">
-        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
-        import { getDatabase, ref, set, get, onValue } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js';
+        // ─────────────────────────────────────────
+        // Data layer — all reads & writes go through the DPM master API.
+        // No direct Firebase SDK connection. Reads are fetch-on-load and
+        // refetch-after-write (no live push updates).
+        // ─────────────────────────────────────────
+        const API_BASE_URL  = "https://alignment-api-khaki.vercel.app/api/dpm-alignment";
+        const EDIT_PASSWORD = "awt123";
+        const TICKETS_NODE  = "awtTickets";   // top-level node this app owns
 
-        // Ticket database configuration
-        const ticketConfig = {
-            apiKey: "AIzaSyAlybpAIuouEZKVhIUxLlf3fjuAm_8Wqyo",
-            authDomain: "awt-tracker.firebaseapp.com",
-            databaseURL: "https://awt-tracker-default-rtdb.firebaseio.com",
-            projectId: "awt-tracker",
-            storageBucket: "awt-tracker.firebasestorage.app",
-            messagingSenderId: "890835294213",
-            appId: "1:890835294213:web:c10b368186d8f610ba646c"
-        };
+        // Cache of the last full GET payload, so the get() shim can read
+        // synchronously-ish from memory the way the old SDK get() did.
+        let _dbCache = {};
 
-        // Location data source configuration
-        const locationConfig = {
-            apiKey: "AIzaSyDIGLmJ5r_fBhB5xOL8oadQ7csN3wGh2dI",
-            authDomain: "dpm-alignment.firebaseapp.com",
-            databaseURL: "https://dpm-alignment-default-rtdb.firebaseio.com",
-            projectId: "dpm-alignment",
-            storageBucket: "dpm-alignment.firebasestorage.app",
-            messagingSenderId: "298588092433",
-            appId: "1:298588092433:web:694a9412658adac039d9b0"
-        };
+        // Pull the whole master DB once. We only use the slices we need
+        // (restaurants for locations, awtTickets for ticket data).
+        async function fetchAll() {
+            const resp = await fetch(API_BASE_URL);
+            if (!resp.ok) throw new Error("Network response was not ok");
+            _dbCache = (await resp.json()) || {};
+            return _dbCache;
+        }
 
-        const appTickets = initializeApp(ticketConfig, "ticketsApp");
-        const appLocations = initializeApp(locationConfig, "locationsApp");
+        // Path helper — kept named ref() so existing call sites are unchanged.
+        // The first arg (formerly a Firebase db handle) is ignored.
+        function ref(_db, path) { return path; }
 
-        const db = getDatabase(appTickets); // Keeps existing ticket logic unchanged
-        const dbLocs = getDatabase(appLocations);
+        // Read a node from the cached payload by slash path, e.g.
+        // get(ref(db,'awtTickets')) or get(ref(dbLocs,'restaurants')).
+        // Returns a Firebase-snapshot-like object with .val().
+        async function get(path) {
+            // Always refresh the cache on an explicit get so we have current data.
+            await fetchAll();
+            const parts = String(path).split('/').filter(Boolean);
+            let node = _dbCache;
+            for (const p of parts) {
+                node = (node && typeof node === 'object') ? node[p] : undefined;
+            }
+            return { val: () => (node === undefined ? null : node) };
+        }
+
+        // Write a node by slash path. Passing value === null deletes it.
+        // Mirrors the old set(ref(db,path), value) signature.
+        async function set(path, value) {
+            const updates = {};
+            updates[String(path)] = (value === undefined ? null : value);
+            const resp = await fetch(API_BASE_URL, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ password: EDIT_PASSWORD, updates })
+            });
+            if (!resp.ok) {
+                let msg = "API Write Error";
+                try { msg = (await resp.json()).error || msg; } catch (e) {}
+                throw new Error(msg);
+            }
+            // Keep the local cache coherent so the next render reflects the write.
+            applyLocalWrite(String(path), value);
+            return resp;
+        }
+
+        // Apply a write to the in-memory cache so UI refreshes immediately
+        // without waiting for a fresh full GET.
+        function applyLocalWrite(path, value) {
+            const parts = path.split('/').filter(Boolean);
+            if (parts.length === 0) return;
+            let node = _dbCache;
+            for (let i = 0; i < parts.length - 1; i++) {
+                const k = parts[i];
+                if (!node[k] || typeof node[k] !== 'object') node[k] = {};
+                node = node[k];
+            }
+            const leaf = parts[parts.length - 1];
+            if (value === null || value === undefined) delete node[leaf];
+            else node[leaf] = value;
+        }
 
         const IMGBB_API_KEY = 'b733862d15744e2bfaa4329d122f4ba0';
+
+        // Legacy handles — kept only so existing ref(db,'…') / ref(dbLocs,'…')
+        // call sites stay valid. They are ignored by the ref() shim above.
+        const db = null, dbLocs = null;
 
         // Will be populated dynamically
         let locs = [];
@@ -241,7 +309,7 @@
         // ─────────────────────────────────────────
         // State
         // Firebase structure:
-        //   jobs/{locId}/tickets/{ticketId} = { s, v, issue, notes:[{n,t,photoUrl?}], archived, createdAt }
+        //   awtTickets/{locId}/tickets/{ticketId} = { s, v, issue, notes:[{n,t,photoUrl?}], archived, createdAt }
         // ─────────────────────────────────────────
         let data = {};
         let markers = {};
@@ -259,6 +327,14 @@
 
         function statusColor(s) {
             return s==='red'?'#ff6b6b':s==='yellow'?'#ffd93d':s==='darkgreen'?'#2d7a4f':s==='green'?'#6bcf7f':'#74b9ff';
+        }
+
+        // Normalize a note's photos into an array, supporting both the
+        // legacy single `photoUrl` field and the new `photoUrls` array.
+        function notePhotos(n) {
+            if(Array.isArray(n.photoUrls) && n.photoUrls.length) return n.photoUrls;
+            if(n.photoUrl) return [n.photoUrl];
+            return [];
         }
 
         function getOpenTicket(locData) {
@@ -286,44 +362,10 @@
         }
 
         // ─────────────────────────────────────────
-        // Migration: v1 flat format → ticket system
-        // Runs once on boot. Safe to re-run (skips already-migrated).
+        // (v1 → ticket-system migration removed: the legacy awt-tracker
+        //  Firebase DB is no longer connected. Tickets now live in the new
+        //  awtTickets node behind the DPM master API, which starts clean.)
         // ─────────────────────────────────────────
-        async function migrateIfNeeded() {
-            const snap = await get(ref(db, 'jobs'));
-            const raw = snap.val();
-            if(!raw) return;
-
-            const writes = [];
-            for(const [lid, val] of Object.entries(raw)) {
-                if(!val || val.tickets) continue; // already migrated or empty
-                if(!val.s) continue; // not a recognizable old record
-
-                const tkId = newTicketId();
-                const ticket = {
-                    s: val.s,
-                    v: val.v || '',
-                    issue: val.issue || '',
-                    notes: val.notes || [],
-                    archived: val.s === 'green', // Done & Paid tickets auto-archive
-                    createdAt: new Date().toISOString(),
-                    migratedFrom: 'v1'
-                };
-                // Attach old photo to first note if present
-                if(val.photoUrl) {
-                    if(ticket.notes.length === 0) {
-                        ticket.notes.push({ n: '(photo from previous version)', t: new Date().toISOString(), photoUrl: val.photoUrl });
-                    } else {
-                        ticket.notes[0] = { ...ticket.notes[0], photoUrl: val.photoUrl };
-                    }
-                }
-                writes.push(set(ref(db, `jobs/${lid}/tickets/${tkId}`), ticket));
-            }
-            if(writes.length > 0) {
-                await Promise.all(writes);
-                console.log(`v2.8 migration: converted ${writes.length} location(s).`);
-            }
-        }
 
         // ─────────────────────────────────────────
         // Stats
@@ -426,6 +468,9 @@
                 let metaHtml = '';
                 if(open) {
                     metaHtml = `<span class="badge-status status-${open.s}">${statusLabel(open.s)}</span>`;
+                    if(open.ticketNo) {
+                        metaHtml += `<span class="ticket-badge badge-open" style="font-size:10px;">#${open.ticketNo}</span>`;
+                    }
                     if(archivedCount > 0) {
                         metaHtml += `<span class="ticket-badge badge-none" style="font-size:10px;">+${archivedCount} archived</span>`;
                     }
@@ -499,22 +544,38 @@
                     const displayDate = t.v || (t.createdAt ? new Date(t.createdAt).toLocaleDateString() : 'No date');
                     const notes = t.notes || [];
 
-                    let notesHtml = notes.map(n => `
+                    let notesHtml = notes.map(n => {
+                        const photos = notePhotos(n);
+                        const photoHtml = photos.length
+                            ? `<div class="note-photo-grid">${photos.map(u => `<img src="${u}" onclick="window.open('${u}','_blank')" title="Click to open full size">`).join('')}</div>`
+                            : '';
+                        return `
                         <div class="archived-note">
                             <div class="archived-note-date">${new Date(n.t).toLocaleString()}</div>
                             ${n.n ? `<div class="archived-note-text">${n.n}</div>` : ''}
-                            ${n.photoUrl ? `<div class="archived-note-photo"><img src="${n.photoUrl}" onclick="window.open('${n.photoUrl}','_blank')" title="Click to open full size"></div>` : ''}
-                        </div>`).join('');
+                            ${photoHtml}
+                        </div>`;
+                    }).join('');
 
                     html += `<div class="archived-ticket">
                         <div class="archived-ticket-header" onclick="this.nextElementSibling.classList.toggle('open')">
-                            <span class="archived-ticket-label">Ticket #${displayNum} — ${displayDate}</span>
+                            <span class="archived-ticket-label">Ticket ${t.ticketNo ? '#' + t.ticketNo : '#' + displayNum} — ${displayDate}</span>
                             <span class="badge-status status-${t.s}" style="font-size:10px;">${statusLabel(t.s)}</span>
                         </div>
                         <div class="archived-ticket-body">
                             ${t.issue ? `<div class="archived-field"><div class="archived-field-label">Issue</div><div class="archived-field-value">${t.issue}</div></div>` : ''}
                             ${notesHtml ? `<div class="archived-field"><div class="archived-field-label">Notes</div>${notesHtml}</div>` : ''}
                             ${!t.issue && !notesHtml ? `<div style="color:var(--text2);font-size:12px;">No details recorded.</div>` : ''}
+                            <div class="archived-status-edit">
+                                <div class="archived-field-label">Status</div>
+                                <select class="form-select" onchange="window.updateArchivedStatus('${lid}','${t.id}',this.value)">
+                                    <option value="blue"      ${t.s==='blue'?      'selected':''}>No Issues</option>
+                                    <option value="red"       ${t.s==='red'?       'selected':''}>Not Started</option>
+                                    <option value="yellow"    ${t.s==='yellow'?    'selected':''}>In Progress</option>
+                                    <option value="darkgreen" ${t.s==='darkgreen'? 'selected':''}>Done &amp; Unpaid</option>
+                                    <option value="green"     ${t.s==='green'?     'selected':''}>Done &amp; Paid</option>
+                                </select>
+                            </div>
                         </div>
                     </div>`;
                 });
@@ -525,15 +586,33 @@
             // ── Active ticket ──
             if(open) {
                 const notes = open.notes || [];
-                const notesListHtml = notes.map(n => `
-                    <div class="note-item">
-                        <div class="note-item-date">${new Date(n.t).toLocaleString()}</div>
-                        ${n.n ? `<div class="note-item-text">${n.note_item_text || n.n}</div>` : ''}
-                        ${n.photoUrl ? `<div class="note-item-photo"><img src="${n.photoUrl}" onclick="window.open('${n.photoUrl}','_blank')" title="Click for full size"></div>` : ''}
-                    </div>`).join('');
+                const notesListHtml = notes.map((n, i) => {
+                    const photos = notePhotos(n);
+                    const photoHtml = photos.length
+                        ? `<div class="note-photo-grid">${photos.map(u => `<img src="${u}" onclick="window.open('${u}','_blank')" title="Click for full size">`).join('')}</div>`
+                        : '';
+                    return `
+                    <div class="note-item draggable" draggable="true" data-note-index="${i}"
+                         ondragstart="window.noteDragStart(event,'${lid}','${openId}',${i})"
+                         ondragover="window.noteDragOver(event)"
+                         ondragleave="window.noteDragLeave(event)"
+                         ondrop="window.noteDrop(event,'${lid}','${openId}',${i})"
+                         ondragend="window.noteDragEnd(event)">
+                        <span class="note-drag-handle" title="Drag to reorder">⠿</span>
+                        <div class="note-item-content">
+                            <div class="note-item-date">${new Date(n.t).toLocaleString()}</div>
+                            ${n.n ? `<div class="note-item-text">${n.n}</div>` : ''}
+                            ${photoHtml}
+                        </div>
+                    </div>`;
+                }).join('');
 
                 html += `<div class="active-ticket-section">
                     <div class="active-ticket-label">🎫 Active Ticket</div>
+                    <div class="form-group">
+                        <label class="form-label">Ticket #</label>
+                        <input type="text" class="form-input" id="tk-no-${lid}" value="${open.ticketNo || ''}" placeholder="e.g. invoice #">
+                    </div>
                     <div class="form-group">
                         <label class="form-label">Status</label>
                         <select class="form-select" id="tk-s-${lid}" onchange="window.previewStatus('${lid}')">
@@ -557,13 +636,12 @@
                         <div class="add-note-label">Add Note</div>
                         <textarea class="add-note-textarea" id="tk-n-${lid}" placeholder="Type a note..."></textarea>
                         <div class="add-note-photo-row">
-                            <input type="file" accept="image/*" id="tk-f-${lid}" style="display:none" onchange="window.handleNotePhoto('${lid}','${openId}',this)">
-                            <button class="add-note-photo-btn" onclick="document.getElementById('tk-f-${lid}').click()">📎 Attach Photo</button>
+                            <input type="file" accept="image/*" multiple id="tk-f-${lid}" style="display:none" onchange="window.handleNotePhotos('${lid}','${openId}',this)">
+                            <button class="add-note-photo-btn" onclick="document.getElementById('tk-f-${lid}').click()">📎 Attach Photos (up to 5)</button>
                             <span class="upload-status" id="tk-upload-${lid}"></span>
-                            <img id="tk-img-${lid}" style="display:none" class="note-photo-preview" onclick="window.open(this.src,'_blank')">
-                            <button class="note-photo-clear" id="tk-imgclear-${lid}" style="display:none" onclick="window.clearNotePhoto('${lid}')">✕ remove</button>
                             <input type="hidden" id="tk-p-${lid}" value="">
                         </div>
+                        <div class="preview-grid" id="tk-previews-${lid}"></div>
                     </div>
                     <div class="btn-group" style="margin-top:10px;">
                         <button class="btn btn-primary"   onclick="window.saveTicket('${lid}','${openId}')">💾 Save</button>
@@ -618,22 +696,25 @@
                 const notes = [...(existing.notes || [])];
 
                 const noteText = document.getElementById(`tk-n-${lid}`)?.value.trim() || '';
-                const photoUrl = document.getElementById(`tk-p-${lid}`)?.value || '';
-                if(noteText || photoUrl) {
+                const photoRaw = document.getElementById(`tk-p-${lid}`)?.value || '';
+                let photoUrls = [];
+                try { photoUrls = photoRaw ? JSON.parse(photoRaw) : []; } catch(e) { photoUrls = []; }
+                if(noteText || photoUrls.length) {
                     const newNote = { n: noteText, t: new Date().toISOString() };
-                    if(photoUrl) newNote.photoUrl = photoUrl;
+                    if(photoUrls.length) newNote.photoUrls = photoUrls;
                     notes.push(newNote);
                 }
-
                 const updated = {
                     ...existing,
+                    ticketNo: document.getElementById(`tk-no-${lid}`)?.value ?? existing.ticketNo ?? '',
                     s:     document.getElementById(`tk-s-${lid}`).value,
                     v:     document.getElementById(`tk-v-${lid}`).value,
                     issue: document.getElementById(`tk-i-${lid}`).value,
                     notes
                 };
 
-                await set(ref(db, `jobs/${lid}/tickets/${tkId}`), updated);
+                await set(ref(db, `awtTickets/${lid}/tickets/${tkId}`), updated);
+                renderFromData();
                 alert('✓ Saved!');
             } catch(err) {
                 alert('Error saving: ' + err.message);
@@ -646,14 +727,17 @@
                 const existing = data[lid]?.tickets?.[tkId] || {};
                 const notes = [...(existing.notes || [])];
                 const noteText = document.getElementById(`tk-n-${lid}`)?.value.trim() || '';
-                const photoUrl = document.getElementById(`tk-p-${lid}`)?.value || '';
-                if(noteText || photoUrl) {
+                const photoRaw = document.getElementById(`tk-p-${lid}`)?.value || '';
+                let photoUrls = [];
+                try { photoUrls = photoRaw ? JSON.parse(photoRaw) : []; } catch(e) { photoUrls = []; }
+                if(noteText || photoUrls.length) {
                     const newNote = { n: noteText, t: new Date().toISOString() };
-                    if(photoUrl) newNote.photoUrl = photoUrl;
+                    if(photoUrls.length) newNote.photoUrls = photoUrls;
                     notes.push(newNote);
                 }
                 const updated = {
                     ...existing,
+                    ticketNo:   document.getElementById(`tk-no-${lid}`)?.value ?? existing.ticketNo ?? '',
                     s:          document.getElementById(`tk-s-${lid}`)?.value  || existing.s,
                     v:          document.getElementById(`tk-v-${lid}`)?.value  || existing.v,
                     issue:      document.getElementById(`tk-i-${lid}`)?.value  || existing.issue,
@@ -661,7 +745,8 @@
                     archived:   true,
                     archivedAt: new Date().toISOString()
                 };
-                await set(ref(db, `jobs/${lid}/tickets/${tkId}`), updated);
+                await set(ref(db, `awtTickets/${lid}/tickets/${tkId}`), updated);
+                renderFromData();
                 markers[lid]?.m.closePopup();
                 window.closeModal();
             } catch(err) {
@@ -672,7 +757,8 @@
         window.deleteTicket = async function(lid, tkId) {
             if(!confirm('Permanently delete this ticket? This cannot be undone.')) return;
             try {
-                await set(ref(db, `jobs/${lid}/tickets/${tkId}`), null);
+                await set(ref(db, `awtTickets/${lid}/tickets/${tkId}`), null);
+                renderFromData();
                 markers[lid]?.m.closePopup();
                 window.closeModal();
             } catch(err) {
@@ -680,65 +766,158 @@
             }
         };
 
+        // Next ticket number = highest existing numeric ticketNo across all
+        // locations, + 1. Seeds at 1001 when there are none yet. Editable later
+        // (you'll overwrite with the vendor's invoice number), so duplicates
+        // are allowed — this only provides a sensible default on creation.
+        function nextTicketNo() {
+            let max = 1000;
+            Object.values(data || {}).forEach(loc => {
+                Object.values(loc?.tickets || {}).forEach(t => {
+                    const n = parseInt(t.ticketNo, 10);
+                    if(!isNaN(n) && n > max) max = n;
+                });
+            });
+            return String(max + 1);
+        }
+
         window.createTicket = async function(lid) {
             try {
                 const tkId = newTicketId();
-                const ticket = { s:'red', v:'', issue:'', notes:[], archived:false, createdAt: new Date().toISOString() };
-                await set(ref(db, `jobs/${lid}/tickets/${tkId}`), ticket);
+                const ticket = { ticketNo: nextTicketNo(), s:'red', v:'', issue:'', notes:[], archived:false, createdAt: new Date().toISOString() };
+                await set(ref(db, `awtTickets/${lid}/tickets/${tkId}`), ticket);
+                renderFromData();
             } catch(err) {
                 alert('Error creating ticket: ' + err.message);
             }
         };
 
         // ─────────────────────────────────────────
-        // Per-note photo upload (imgbb)
+        // Multi-photo upload (imgbb) — up to 5 at once
         // ─────────────────────────────────────────
-        window.handleNotePhoto = async function(lid, tkId, inputEl) {
-            const file = inputEl.files?.[0];
-            if(!file) return;
-            if(!file.type.startsWith('image/')) { alert('Please choose an image file.'); inputEl.value=''; return; }
+        const MAX_PHOTOS = 5;
 
-            const statusEl  = document.getElementById(`tk-upload-${lid}`);
-            const imgEl     = document.getElementById(`tk-img-${lid}`);
+        window.handleNotePhotos = async function(lid, tkId, inputEl) {
             const hiddenEl  = document.getElementById(`tk-p-${lid}`);
-            const clearBtn  = document.getElementById(`tk-imgclear-${lid}`);
+            const statusEl  = document.getElementById(`tk-upload-${lid}`);
+            const gridEl    = document.getElementById(`tk-previews-${lid}`);
 
-            statusEl.textContent = 'Uploading…';
-            const localUrl = URL.createObjectURL(file);
-            imgEl.src = localUrl;
-            imgEl.style.display = '';
-            imgEl.style.opacity = '0.5';
+            let current = [];
+            try { current = hiddenEl.value ? JSON.parse(hiddenEl.value) : []; } catch(e) { current = []; }
+
+            let files = Array.from(inputEl.files || []).filter(f => f.type.startsWith('image/'));
+            if(files.length === 0) { inputEl.value=''; return; }
+
+            const room = MAX_PHOTOS - current.length;
+            if(room <= 0) { alert(`You can attach up to ${MAX_PHOTOS} photos per note.`); inputEl.value=''; return; }
+            if(files.length > room) {
+                alert(`Only ${room} more photo(s) can be added (max ${MAX_PHOTOS}). Extra files were skipped.`);
+                files = files.slice(0, room);
+            }
+
+            statusEl.textContent = `Uploading ${files.length}…`;
 
             try {
-                const formData = new FormData();
-                formData.append('image', file);
-                const res  = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, { method:'POST', body:formData });
-                const json = await res.json();
-                if(!json.success) throw new Error(json.error?.message || 'Upload failed');
-
-                hiddenEl.value       = json.data.url;
-                imgEl.src            = json.data.url;
-                imgEl.style.opacity  = '1';
-                clearBtn.style.display = '';
-                statusEl.textContent = '✓ Ready';
-                URL.revokeObjectURL(localUrl);
+                const uploads = files.map(async file => {
+                    const formData = new FormData();
+                    formData.append('image', file);
+                    const res  = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, { method:'POST', body:formData });
+                    const json = await res.json();
+                    if(!json.success) throw new Error(json.error?.message || 'Upload failed');
+                    return json.data.url;
+                });
+                const urls = await Promise.all(uploads);
+                current = [...current, ...urls];
+                hiddenEl.value = JSON.stringify(current);
+                statusEl.textContent = `✓ ${current.length} ready`;
+                renderPreviews(lid);
             } catch(err) {
-                imgEl.style.display  = 'none';
-                hiddenEl.value       = '';
-                inputEl.value        = '';
                 statusEl.textContent = '';
-                URL.revokeObjectURL(localUrl);
                 alert('Photo upload failed: ' + err.message);
+            } finally {
+                inputEl.value = '';
             }
         };
 
-        window.clearNotePhoto = function(lid) {
-            document.getElementById(`tk-p-${lid}`).value          = '';
-            document.getElementById(`tk-img-${lid}`).style.display = 'none';
-            document.getElementById(`tk-imgclear-${lid}`).style.display = 'none';
-            document.getElementById(`tk-upload-${lid}`).textContent = '';
-            const f = document.getElementById(`tk-f-${lid}`);
-            if(f) f.value = '';
+        function renderPreviews(lid) {
+            const hiddenEl = document.getElementById(`tk-p-${lid}`);
+            const gridEl   = document.getElementById(`tk-previews-${lid}`);
+            if(!gridEl) return;
+            let urls = [];
+            try { urls = hiddenEl.value ? JSON.parse(hiddenEl.value) : []; } catch(e) { urls = []; }
+            gridEl.innerHTML = urls.map((u, i) => `
+                <span class="preview-thumb-wrap">
+                    <img src="${u}" class="note-photo-preview" onclick="window.open('${u}','_blank')">
+                    <button class="thumb-remove" title="Remove" onclick="window.removeNotePhoto('${lid}',${i})">✕</button>
+                </span>`).join('');
+        }
+
+        window.removeNotePhoto = function(lid, idx) {
+            const hiddenEl = document.getElementById(`tk-p-${lid}`);
+            let urls = [];
+            try { urls = hiddenEl.value ? JSON.parse(hiddenEl.value) : []; } catch(e) { urls = []; }
+            urls.splice(idx, 1);
+            hiddenEl.value = urls.length ? JSON.stringify(urls) : '';
+            const statusEl = document.getElementById(`tk-upload-${lid}`);
+            if(statusEl) statusEl.textContent = urls.length ? `✓ ${urls.length} ready` : '';
+            renderPreviews(lid);
+        };
+
+        // ─────────────────────────────────────────
+        // Edit status of an archived ticket (instant)
+        // ─────────────────────────────────────────
+        window.updateArchivedStatus = async function(lid, tkId, newStatus) {
+            try {
+                await set(ref(db, `awtTickets/${lid}/tickets/${tkId}/s`), newStatus);
+                renderFromData();
+            } catch(err) {
+                alert('Error updating status: ' + err.message);
+            }
+        };
+
+        // ─────────────────────────────────────────
+        // Drag-and-drop note reordering (timestamps preserved)
+        // ─────────────────────────────────────────
+        let dragState = null;
+
+        window.noteDragStart = function(ev, lid, tkId, index) {
+            dragState = { lid, tkId, from: index };
+            ev.dataTransfer.effectAllowed = 'move';
+            ev.currentTarget.classList.add('dragging');
+        };
+        window.noteDragOver = function(ev) {
+            ev.preventDefault();
+            ev.dataTransfer.dropEffect = 'move';
+            const item = ev.currentTarget;
+            if(!item.classList.contains('dragging')) item.classList.add('drag-over');
+        };
+        window.noteDragLeave = function(ev) {
+            ev.currentTarget.classList.remove('drag-over');
+        };
+        window.noteDragEnd = function(ev) {
+            ev.currentTarget.classList.remove('dragging');
+            document.querySelectorAll('.note-item.drag-over').forEach(n => n.classList.remove('drag-over'));
+        };
+        window.noteDrop = async function(ev, lid, tkId, toIndex) {
+            ev.preventDefault();
+            ev.currentTarget.classList.remove('drag-over');
+            if(!dragState || dragState.lid !== lid || dragState.tkId !== tkId) return;
+            const from = dragState.from;
+            dragState = null;
+            if(from === toIndex) return;
+
+            const ticket = data[lid]?.tickets?.[tkId];
+            if(!ticket || !Array.isArray(ticket.notes)) return;
+            const notes = [...ticket.notes];           // each note keeps its own t (timestamp)
+            const [moved] = notes.splice(from, 1);
+            notes.splice(toIndex, 0, moved);
+
+            try {
+                await set(ref(db, `awtTickets/${lid}/tickets/${tkId}/notes`), notes);
+                renderFromData();
+            } catch(err) {
+                alert('Error reordering notes: ' + err.message);
+            }
         };
 
         // ─────────────────────────────────────────
@@ -759,12 +938,42 @@
             document.querySelector('.sidebar')?.scrollTo({ top:0, behavior:'smooth' });
         };
 
+        // Re-render everything from the current ticket cache.
+        function renderFromData() {
+            Object.keys(markers).forEach(updateMarker);
+            updateStats();
+            renderList();
+            Object.values(markers).forEach(mk => {
+                if(mk.m.isPopupOpen()) mk.m.setPopupContent(buildPanel(mk.l));
+            });
+            const modal = document.getElementById('modal');
+            if(modal.classList.contains('active')) {
+                const title = modal.querySelector('.panel-title')?.textContent;
+                const l = title ? locs.find(x => x.n === title) : null;
+                if(l) document.getElementById('modal-body').innerHTML = buildPanel(l);
+            }
+        }
+
+        // Fetch the latest tickets from the API and re-render. Replaces the
+        // old live onValue() listener. Called on load, after every write, and
+        // on a slow interval so other users' changes eventually appear.
+        window.refreshTickets = async function() {
+            try {
+                const snap = await get(ref(db, TICKETS_NODE));
+                data = snap.val() || {};
+                renderFromData();
+            } catch(err) {
+                console.error("Failed to refresh tickets:", err);
+            }
+        };
+
         // ─────────────────────────────────────────
         // Initialization Boot Sequence
         // ─────────────────────────────────────────
         (async () => {
             try {
-                // 1. Load restaurant records from location Firebase database
+                // 1. Load restaurant records (only the restaurants slice of the
+                //    master DB payload is used; other nodes are ignored).
                 const snap = await get(ref(dbLocs, 'restaurants'));
                 const rawRestaurants = snap.val() || {};
 
@@ -783,41 +992,17 @@
                     ...loadedLocs
                 ];
 
-                // Run migration once if there are legacy layouts
-                await migrateIfNeeded();
-
                 // 4. Build map markers (must happen after locations have loaded)
                 addMarkers();
 
-                // 5. Start ticket listeners
-                onValue(ref(db, 'jobs'), ticketSnap => {
-                    data = ticketSnap.val() || {};
-                    
-                    // Update markers based on ticket status changed
-                    Object.keys(markers).forEach(updateMarker);
+                // 5. Initial ticket load + re-render
+                await refreshTickets();
 
-                    // 6. Render statistics
-                    updateStats();
-
-                    // 7. Render sidebar
-                    renderList();
-
-                    // Refresh any open popup
-                    Object.values(markers).forEach(mk => {
-                        if(mk.m.isPopupOpen()) mk.m.setPopupContent(buildPanel(mk.l));
-                    });
-
-                    // Refresh mobile modal if open
-                    const modal = document.getElementById('modal');
-                    if(modal.classList.contains('active')) {
-                        const title = modal.querySelector('.panel-title')?.textContent;
-                        const l = title ? locs.find(x => x.n === title) : null;
-                        if(l) document.getElementById('modal-body').innerHTML = buildPanel(l);
-                    }
-                });
+                // 6. Poll for other users' changes every 20s (no live push on API).
+                setInterval(() => { window.refreshTickets(); }, 20000);
 
             } catch (err) {
-                console.error("Failed to load dynamically from Firebase:", err);
+                console.error("Failed to load data from API:", err);
             }
         })();
     </script>
