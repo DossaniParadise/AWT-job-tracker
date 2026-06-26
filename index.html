@@ -143,17 +143,17 @@
    This board does NOT own any tickets. Jobs live in ONE place: the
    `maintenanceTickets` node, owned and created by the internal RM-Tracker.
    A job appears on this board purely because its `assignedVendorId` equals
-   this board's VENDOR_ID. The board reads those tickets and writes status +
+   this board's vendor (matched by name). The board reads those tickets and writes status +
    comments back to the SAME record. No mirror node, no copies, no reconcile.
 
    ── SCALE ────────────────────────────────────────────────────────────────
-   The board fetches ONLY its slice via  GET ...?vendor=<VENDOR_ID>  which
+   The board fetches ONLY its slice via  GET ...?vendor=<VENDOR_NAME>  which
    returns just this vendor's tickets + a trimmed restaurants map. As stores
    and tickets grow, per-load payload stays proportional to THIS vendor's
    work, not the whole company.
 
    ── MAKING ANOTHER VENDOR BOARD ──────────────────────────────────────────
-   Copy this file and change VENDOR_ID (and the title). Nothing else.
+   Copy this file and change VENDOR_NAME (and the title). Nothing else.
    The vendor's id is the key under maintenanceVendors in the master DB.
 
    ── STATUS MODEL (single canonical status, no second field) ───────────────
@@ -172,7 +172,12 @@
    ════════════════════════════════════════════════════════════════════════ */
 
 // ── Board identity: the only thing that changes per vendor board ──
-const VENDOR_ID = "AWT";   // ← set to the maintenanceVendors key for this board
+// VENDOR_NAME is matched (case-insensitively) against the vendor's NAME in the
+// RM app's vendor list — NOT its database key. This means you can delete and
+// re-add the vendor in RM and this board keeps working, as long as the name is
+// the same. The API resolves the name to the real key and returns it as
+// `vendorKey`, which we use for write-backs.
+const VENDOR_NAME = "AWT";   // ← must match the vendor's NAME in RM's vendor list
 const BOARD_TITLE = "AWT Dossani Job Board";   // ← shown in the header & tab
 
 const API_BASE_URL = "https://alignment-api-khaki.vercel.app/api/dpm-alignment";
@@ -197,6 +202,7 @@ function statusView(s){
 
 // ── State ──
 let TICKETS={}, RESTAURANTS={}, VENDOR=null;
+let VENDOR_KEY=null;   // the real maintenanceVendors key, resolved by the API
 let curFilter=null, curSearch="";
 let openId=null;
 
@@ -212,15 +218,18 @@ function toast(msg,kind){const t=$("toast");t.textContent=msg;t.className="toast
 
 // ── Data layer ──
 async function apiGet(){
-  const r=await fetch(`${API_BASE_URL}?vendor=${encodeURIComponent(VENDOR_ID)}`,{cache:"no-store"});
+  // Identify by NAME; the API resolves it to the real vendor key.
+  const r=await fetch(`${API_BASE_URL}?vendor=${encodeURIComponent(VENDOR_NAME)}`,{cache:"no-store"});
   if(!r.ok) throw new Error("Could not reach the server");
   return await r.json();
 }
-// Write a single ticket back. Sends vendorId so the API can verify ownership.
+// Write a single ticket back. Sends the RESOLVED vendor key so the API can
+// verify this ticket belongs to us. (Falls back to the name if the key hasn't
+// resolved yet — the API accepts either.)
 async function apiWriteTicket(id,ticket){
   const updates={}; updates[`maintenanceTickets/${id}`]=ticket;
   const r=await fetch(API_BASE_URL,{method:"POST",headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({password:WRITE_PASSWORD,vendorId:VENDOR_ID,updates})});
+    body:JSON.stringify({password:WRITE_PASSWORD,vendorId:(VENDOR_KEY||VENDOR_NAME),updates})});
   if(!r.ok){let m="Write failed";try{m=(await r.json()).error||m}catch(e){}throw new Error(m)}
 }
 
@@ -229,9 +238,11 @@ async function load(){
   TICKETS=data.maintenanceTickets||{};
   RESTAURANTS=data.restaurants||{};
   VENDOR=data.vendor||null;
+  VENDOR_KEY=data.vendorKey||null;   // remember the resolved key for write-backs
   $("boardTitle").textContent=BOARD_TITLE;
   document.title=BOARD_TITLE;
-  $("boardSub").textContent=Object.keys(TICKETS).length+" jobs · "+Object.keys(RESTAURANTS).length+" stores";
+  const warn=(!VENDOR_KEY)?" · ⚠ vendor not found":"";
+  $("boardSub").textContent=Object.keys(TICKETS).length+" jobs · "+Object.keys(RESTAURANTS).length+" stores"+warn;
 }
 
 // ── Render ──
@@ -386,7 +397,7 @@ window.lightbox=function(u){ $("lightboxImg").src=u; $("lightbox").classList.add
 window.setStatus=async function(id,s){
   const t=TICKETS[id]; if(!t||t.status===s) { closeModal(); return; }
   const activity=Array.isArray(t.activity)?t.activity.slice():[];
-  activity.push({ts:now(),by:(VENDOR&&VENDOR.name)||VENDOR_ID,role:"vendor",action:"status",toStatus:s,note:"via vendor board"});
+  activity.push({ts:now(),by:(VENDOR&&VENDOR.name)||VENDOR_NAME,role:"vendor",action:"status",toStatus:s,note:"via vendor board"});
   const updated={...t,status:s,activity,updatedAt:now()};
   delete updated._id;
   try{
@@ -403,7 +414,7 @@ window.postComment=async function(id){
   const btn=$("cmtSend"); btn.disabled=true; btn.innerHTML='<span class="spin"></span>';
   const t=TICKETS[id];
   const comments=Array.isArray(t.comments)?t.comments.slice():[];
-  comments.push({id:uid(),by:(VENDOR&&VENDOR.name)||VENDOR_ID,role:"vendor",text,ts:now()});
+  comments.push({id:uid(),by:(VENDOR&&VENDOR.name)||VENDOR_NAME,role:"vendor",text,ts:now()});
   const updated={...t,comments,updatedAt:now()}; delete updated._id;
   try{
     await apiWriteTicket(id,updated);
