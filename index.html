@@ -12,33 +12,54 @@
     --red:#ff6b6b; --yellow:#ffd93d; --green:#6bcf7f; --darkgreen:#2d7a4f; --blue:#74b9ff;
     --text:#fff; --text2:#cbd5e1; --border:#2d3a5f;
   }
-  body{font-family:'Space Mono',monospace;background:var(--bg);color:var(--text);min-height:100vh}
-  .wrap{max-width:780px;margin:0 auto;padding:18px}
-  header{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:6px;flex-wrap:wrap}
-  h1{font-size:18px}
-  .sub{font-size:11px;color:var(--text2);letter-spacing:.08em;text-transform:uppercase}
-  .poll{font-size:10px;color:var(--text2)}
+  body{font-family:'Space Mono',monospace;background:var(--bg);color:var(--text)}
 
-  /* stats */
-  .stats{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}
-  .stat{flex:1 1 calc(25% - 8px);min-width:84px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px 6px;text-align:center;cursor:pointer;transition:.15s}
+  /* Single scrolling sidebar (no map pane on the vendor board). */
+  .sidebar{background:var(--bg);min-height:100vh;padding:20px;max-width:900px;margin:0 auto}
+  .sidebar h1{font-size:18px;margin-bottom:2px}
+  .sidebar .sub{font-size:11px;color:var(--text2);letter-spacing:.08em;text-transform:uppercase;margin-bottom:18px}
+  .poll{font-size:10px;color:var(--text2);float:right}
+
+  /* ── Stats bar ── */
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
+  .stat{background:var(--bg2);padding:12px 6px;border-radius:8px;text-align:center;border:1px solid var(--border);cursor:pointer;transition:all .2s;min-width:0;overflow:hidden}
+  .stat:hover{transform:translateY(-2px);border-color:var(--blue)}
+  .stat:active{transform:translateY(0)}
   .stat.active{border-color:var(--blue)}
-  .stat-num{font-size:20px;font-weight:700;line-height:1.1}
-  .stat-label{font-size:8px;color:var(--text2);text-transform:uppercase;margin-top:4px;letter-spacing:.04em}
+  .stat-num{font-size:24px;font-weight:700;line-height:1.1}
+  .stat-label{font-size:9px;color:var(--text2);text-transform:uppercase;margin-top:4px;line-height:1.2;word-break:break-word}
 
-  .controls{display:flex;gap:8px;margin-bottom:14px}
-  .search{flex:1;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-family:inherit;font-size:13px;outline:none}
-  .search:focus{border-color:var(--blue)}
+  /* ── Controls bar (search) ── */
+  .controls-bar{display:flex;gap:8px;margin-bottom:14px;align-items:center}
+  .search-input{flex:1;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-family:'Space Mono',monospace;font-size:13px;outline:none}
+  .search-input:focus{border-color:var(--blue)}
+  .search-input::placeholder{color:var(--text2)}
 
-  .store{margin-bottom:14px}
-  .store-h{font-size:12px;font-weight:700;color:var(--text2);border-bottom:2px solid var(--border);padding:8px 0;margin-bottom:8px}
-  .store-h small{color:var(--text2);font-weight:400}
+  /* ── Two-column store list ── */
+  .location-list{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .location-column{display:flex;flex-direction:column;gap:8px}
+  .column-header{font-size:12px;font-weight:700;color:var(--text2);padding:8px 0;border-bottom:2px solid var(--border);margin-bottom:4px}
+  .no-results{grid-column:1 / -1;text-align:center;color:var(--text2);font-size:13px;padding:30px 0}
 
-  .card{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;cursor:pointer;transition:.15s}
-  .card:hover{border-color:var(--blue)}
-  .card-top{display:flex;justify-content:space-between;gap:8px;align-items:center}
-  .card-id{font-size:11px;color:var(--text2)}
-  .card-desc{font-size:14px;font-weight:700;margin:6px 0;line-height:1.35;overflow-wrap:anywhere}
+  /* ── Location cards (per store) ── */
+  .card{background:var(--bg2);border:2px solid var(--border);border-radius:8px;padding:12px;cursor:pointer;transition:all .2s}
+  .card:hover{border-color:var(--blue);transform:translateY(-1px)}
+  .card-name{font-size:15px;font-weight:700;margin-bottom:6px;line-height:1.3;overflow-wrap:anywhere}
+  .card-addr{font-size:12px;color:var(--text2);margin-bottom:8px;line-height:1.4;overflow-wrap:anywhere}
+  .card-meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .ticket-badge{display:inline-block;padding:3px 10px;border-radius:4px;font-size:11px;font-weight:700}
+  .badge-none{background:rgba(45,58,95,.4);color:var(--text2);border:1px solid var(--border)}
+  .badge-status{display:inline-block;padding:3px 10px;border-radius:4px;font-size:11px;font-weight:700}
+  .status-dispatched{background:rgba(255,107,107,.2);color:var(--red);border:1px solid var(--red)}
+  .status-in_progress{background:rgba(255,217,61,.2);color:var(--yellow);border:1px solid var(--yellow)}
+  .status-finished{background:rgba(45,122,79,.3);color:#9fe3b8;border:1px solid var(--darkgreen)}
+  .status-closed{background:rgba(107,207,127,.2);color:var(--green);border:1px solid var(--green)}
+  .status-waiting{background:rgba(116,185,255,.2);color:var(--blue);border:1px solid var(--blue)}
+  .status-other{background:rgba(45,58,95,.4);color:var(--text2);border:1px solid var(--border)}
+
+  .empty{text-align:center;color:var(--text2);font-size:13px;padding:40px 0}
+
+  /* badge classes used inside the detail sheet keep the s-* names */
   .badge{display:inline-block;padding:3px 10px;border-radius:4px;font-size:11px;font-weight:700;white-space:nowrap}
   .s-dispatched{background:rgba(255,107,107,.18);color:var(--red);border:1px solid var(--red)}
   .s-in_progress{background:rgba(255,217,61,.18);color:var(--yellow);border:1px solid var(--yellow)}
@@ -47,7 +68,17 @@
   .s-waiting{background:rgba(116,185,255,.15);color:var(--blue);border:1px solid var(--blue)}
   .s-other{background:rgba(45,58,95,.4);color:var(--text2);border:1px solid var(--border)}
 
-  .empty{text-align:center;color:var(--text2);font-size:13px;padding:40px 0}
+  /* mobile: single column, like the old app */
+  @media(max-width:699px){
+    .sidebar{padding:14px}
+    .stats{gap:8px}
+    .location-list{grid-template-columns:1fr;gap:16px}
+    .card{padding:14px}
+    .card-name{font-size:16px}
+  }
+  @media(max-width:380px){
+    .stats{grid-template-columns:repeat(2,1fr)}
+  }
 
   /* modal */
   .modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:1000;align-items:flex-start;justify-content:center;padding:0;overflow:auto;-webkit-overflow-scrolling:touch}
@@ -89,16 +120,15 @@
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header>
-    <div><h1 id="boardTitle">Job Board</h1><div class="sub" id="boardSub">loading…</div></div>
-    <div class="poll" id="poll">·</div>
-  </header>
+<div class="sidebar">
+  <div class="poll" id="poll">·</div>
+  <h1 id="boardTitle">Job Board</h1>
+  <div class="sub" id="boardSub">loading…</div>
   <div class="stats" id="stats"></div>
-  <div class="controls">
-    <input class="search" id="search" placeholder="🔍 Search store, number, or job…" oninput="onSearch(this.value)">
+  <div class="controls-bar">
+    <input class="search-input" id="search" placeholder="🔍 Search store, number, or job…" oninput="onSearch(this.value)">
   </div>
-  <div id="list"><div class="empty">Loading…</div></div>
+  <div class="location-list" id="list"><div class="empty">Loading…</div></div>
 </div>
 
 <div class="modal" id="modal"><div class="sheet" id="sheet"></div></div>
@@ -213,61 +243,91 @@ function ticketsArray(){
   return Object.entries(TICKETS).map(([id,t])=>({_id:id,...t}));
 }
 
+// Urgency so a store card with several jobs shows its "worst" open status.
+const STATUS_URGENCY={dispatched:5,in_progress:4,waiting:3,finished:2,closed:1};
+function mostUrgent(tix){let best=null,r=-1;tix.forEach(t=>{const x=STATUS_URGENCY[t.status]||0;if(x>r){r=x;best=t.status;}});return best;}
+
 function renderStats(){
   const counts={dispatched:0,in_progress:0,finished:0,closed:0};
   ticketsArray().forEach(t=>{ if(counts[t.status]!==undefined) counts[t.status]++; });
   const order=["dispatched","in_progress","finished","closed"];
+  const colorOf=s=>s==='dispatched'?'red':s==='in_progress'?'yellow':s==='finished'?'darkgreen':'green';
   $("stats").innerHTML=order.map(s=>{
     const v=VENDOR_STATUS[s];
     const on=curFilter===s?" active":"";
     return `<div class="stat${on}" onclick="toggleFilter('${s}')">
-      <div class="stat-num" style="color:var(--${s==='dispatched'?'red':s==='in_progress'?'yellow':s==='finished'?'darkgreen':'green'})">${counts[s]}</div>
+      <div class="stat-num" style="color:var(--${colorOf(s)})">${counts[s]}</div>
       <div class="stat-label">${esc(v.label)}</div></div>`;
   }).join("");
 }
 
+// Categorize a store into a column the way the original app did.
+function storeCategory(sid){
+  const n=storeName(sid);
+  return (n.includes("Burger King")||n.includes("Subway"))?"ff":"cs";
+}
+
 function render(){
   renderStats();
+
+  // Group THIS vendor's tickets by store, applying status filter + search.
   let arr=ticketsArray();
   if(curFilter) arr=arr.filter(t=>t.status===curFilter);
   if(curSearch){
     const q=curSearch.toLowerCase();
-    arr=arr.filter(t=>{
-      const hay=`${storeName(t.storeId)} ${storeNum(t.storeId)} ${storeAddr(t.storeId)} ${t.description||""} ${t.shortId||""}`.toLowerCase();
-      return hay.includes(q);
-    });
+    arr=arr.filter(t=>`${storeName(t.storeId)} ${storeNum(t.storeId)} ${storeAddr(t.storeId)} ${t.description||""} ${t.shortId||""}`.toLowerCase().includes(q));
   }
-  const list=$("list");
-  if(!arr.length){ list.innerHTML=`<div class="empty">No jobs${curFilter||curSearch?" match this view":" assigned yet"}.</div>`; return; }
-
-  // group by store
   const byStore={};
   arr.forEach(t=>{ (byStore[t.storeId]=byStore[t.storeId]||[]).push(t); });
-  const storeIds=Object.keys(byStore).sort((a,b)=>{
+
+  const list=$("list");
+  const storeIds=Object.keys(byStore);
+  if(!storeIds.length){ list.innerHTML=`<div class="empty">No jobs${curFilter||curSearch?" match this view":" assigned yet"}.</div>`; return; }
+
+  // Sort by store number then name.
+  const sortStores=ids=>ids.sort((a,b)=>{
     const na=parseInt(String(storeNum(a)).replace(/\D/g,""))||0, nb=parseInt(String(storeNum(b)).replace(/\D/g,""))||0;
-    if(na&&nb) return na-nb;
+    if(na&&nb) return na-nb; if(na) return -1; if(nb) return 1;
     return storeName(a).localeCompare(storeName(b));
   });
-  list.innerHTML=storeIds.map(sid=>{
-    const cards=byStore[sid].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)).map(t=>{
-      const v=statusView(t.status);
-      return `<div class="card" onclick="openTicket('${t._id}')">
-        <div class="card-top">
-          <span class="card-id">#${esc(t.shortId||t._id.slice(0,6))}</span>
-          <span class="badge ${v.cls}">${esc(v.label)}</span>
-        </div>
-        <div class="card-desc">${esc(t.description||"(no description)")}</div>
-        <div class="card-id">${t.createdAt?("Filed "+fmtDate(t.createdAt)):""}</div>
-      </div>`;
-    }).join("");
-    return `<div class="store">
-      <div class="store-h">${esc(storeName(sid))} ${storeNum(sid)?`<small>· #${esc(storeNum(sid))}</small>`:""}</div>
-      ${cards}</div>`;
-  }).join("");
+  const ff=sortStores(storeIds.filter(s=>storeCategory(s)==="ff"));
+  const cs=sortStores(storeIds.filter(s=>storeCategory(s)==="cs"));
+
+  const mkCard=sid=>{
+    const tix=byStore[sid].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+    const newest=tix[0];
+    const urgent=mostUrgent(tix);
+    const uv=statusView(urgent);
+    let meta=`<span class="badge-status status-${VENDOR_STATUS[urgent]?urgent:'other'}">${esc(uv.label)}</span>`;
+    if(tix.length>1) meta+=`<span class="ticket-badge badge-none" style="font-size:10px;">${tix.length} jobs</span>`;
+    else if(newest.shortId) meta+=`<span class="ticket-badge badge-none" style="font-size:10px;">#${esc(newest.shortId)}</span>`;
+    const addr=storeAddr(sid);
+    return `<div class="card" onclick="openStore('${sid}')">
+      <div class="card-name">${esc(storeName(sid))}${storeNum(sid)?` <span style="color:var(--text2);font-weight:400;">#${esc(storeNum(sid))}</span>`:""}</div>
+      ${addr?`<div class="card-addr">${esc(addr)}</div>`:""}
+      <div class="card-meta">${meta}</div>
+    </div>`;
+  };
+
+  const col=(header,ids)=>`<div class="location-column">
+    <div class="column-header">${header}</div>
+    ${ids.map(mkCard).join("")}
+  </div>`;
+
+  // Two columns: Fast Food / C-Store, matching the original.
+  list.innerHTML = col("Fast Food", ff) + col("C-Store", cs);
 }
 
 window.toggleFilter=function(s){ curFilter=curFilter===s?null:s; render(); };
 window.onSearch=function(v){ curSearch=(v||"").trim(); render(); };
+
+// Open a store: if it has one job, open it directly; if several, open the
+// newest (the detail sheet lists the store's other jobs to switch between).
+window.openStore=function(sid){
+  const tix=ticketsArray().filter(t=>t.storeId===sid).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  if(!tix.length) return;
+  openTicket(tix[0]._id);
+};
 
 // ── Ticket detail ──
 window.openTicket=function(id){
@@ -289,6 +349,16 @@ window.openTicket=function(id){
     return `<button class="status-btn b-${s}${cur}" onclick="setStatus('${id}','${s}')">${esc(sv.label)}</button>`;
   }).join("");
 
+  // Other jobs at the same store (so multi-job stores are navigable).
+  const siblings=ticketsArray().filter(x=>x.storeId===t.storeId && x._id!==id)
+    .sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  const siblingHtml=siblings.length?`<div class="field-label">Other jobs at this store</div>`+
+    siblings.map(s=>{const sv=statusView(s.status);
+      return `<div class="card" style="margin-bottom:6px" onclick="openTicket('${s._id}')">
+        <div class="card-meta"><span class="badge ${sv.cls}">${esc(sv.label)}</span>
+        <span class="card-addr" style="margin:0">#${esc(s.shortId||s._id.slice(0,6))} — ${esc((s.description||"").slice(0,40))}${(s.description||"").length>40?"…":""}</span></div>
+      </div>`;}).join(""):"";
+
   $("sheet").innerHTML=`
     <div class="sheet-h"><h2>#${esc(t.shortId||id.slice(0,6))}</h2><button class="x" onclick="closeModal()">✕ Close</button></div>
     <div class="sheet-b">
@@ -300,6 +370,7 @@ window.openTicket=function(id){
       <div class="field-label">Job</div>
       <div class="val">${esc(t.description||"(no description)")}</div>
       ${photoHtml}
+      ${siblingHtml}
       <div class="field-label">Comments</div>
       <div class="cmts" id="cmts">${cmtHtml}</div>
       <textarea class="cmt-in" id="cmtIn" placeholder="Add a comment…"></textarea>
