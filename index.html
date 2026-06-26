@@ -1,1241 +1,362 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
-    <title>DPM AWT Job Tracker v1.6</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        :root {
-            --bg: #0a0e27;
-            --bg2: #1a2140;
-            --bg3: #111830;
-            --red: #ff6b6b;
-            --yellow: #ffd93d;
-            --green: #6bcf7f;
-            --darkgreen: #2d7a4f;
-            --blue: #74b9ff;
-            --purple: #a855f7;
-            --text: #ffffff;
-            --text2: #cbd5e1;
-            --border: #2d3a5f;
-        }
-        body { font-family: 'Space Mono', monospace; background: var(--bg); color: var(--text); }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+<title>AWT Job Board v2.0</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{
+    --bg:#0a0e27; --bg2:#1a2140; --bg3:#111830;
+    --red:#ff6b6b; --yellow:#ffd93d; --green:#6bcf7f; --darkgreen:#2d7a4f; --blue:#74b9ff;
+    --text:#fff; --text2:#cbd5e1; --border:#2d3a5f;
+  }
+  body{font-family:'Space Mono',monospace;background:var(--bg);color:var(--text);min-height:100vh}
+  .wrap{max-width:780px;margin:0 auto;padding:18px}
+  header{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:6px;flex-wrap:wrap}
+  h1{font-size:18px}
+  .sub{font-size:11px;color:var(--text2);letter-spacing:.08em;text-transform:uppercase}
+  .poll{font-size:10px;color:var(--text2)}
 
-        .container { display: grid; grid-template-columns: 1fr 500px; height: 100vh; }
-        .map-section { position: relative; }
-        #map { width: 100%; height: 100%; filter: brightness(0.9); }
+  /* stats */
+  .stats{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}
+  .stat{flex:1 1 calc(25% - 8px);min-width:84px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px 6px;text-align:center;cursor:pointer;transition:.15s}
+  .stat.active{border-color:var(--blue)}
+  .stat-num{font-size:20px;font-weight:700;line-height:1.1}
+  .stat-label{font-size:8px;color:var(--text2);text-transform:uppercase;margin-top:4px;letter-spacing:.04em}
 
-        .sidebar { background: var(--bg); overflow-y: auto; padding: 20px; }
-        .sidebar::-webkit-scrollbar { width: 0; height: 0; }
-        .sidebar { scrollbar-width: none; -ms-overflow-style: none; }
-        .sidebar h2 { font-size: 18px; margin-bottom: 20px; }
+  .controls{display:flex;gap:8px;margin-bottom:14px}
+  .search{flex:1;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-family:inherit;font-size:13px;outline:none}
+  .search:focus{border-color:var(--blue)}
 
-        /* ── Stats bar ── */
-        .stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 20px; }
-        .stat { background: var(--bg2); padding: 12px 6px; border-radius: 8px; text-align: center; border: 1px solid var(--border); cursor: pointer; transition: all 0.2s; min-width: 0; overflow: hidden; }
-        .stat:hover { transform: translateY(-2px); border-color: var(--blue); }
-        .stat:active { transform: translateY(0); }
-        .stat-num { font-size: 24px; font-weight: 700; line-height: 1.1; }
-        .stat-label { font-size: 9px; color: var(--text2); text-transform: uppercase; margin-top: 4px; line-height: 1.2; word-break: break-word; hyphens: auto; }
+  .store{margin-bottom:14px}
+  .store-h{font-size:12px;font-weight:700;color:var(--text2);border-bottom:2px solid var(--border);padding:8px 0;margin-bottom:8px}
+  .store-h small{color:var(--text2);font-weight:400}
 
-        /* ── Controls bar (search + sort) ── */
-        .controls-bar { display: flex; gap: 8px; margin-bottom: 14px; align-items: center; }
-        .search-input { flex: 1; background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; color: var(--text); font-family: 'Space Mono', monospace; font-size: 13px; outline: none; }
-        .search-input:focus { border-color: var(--blue); }
-        .search-input::placeholder { color: var(--text2); }
-        .sort-toggle { display: flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; flex-shrink: 0; }
-        .sort-btn { background: var(--bg2); color: var(--text2); border: none; padding: 9px 12px; font-family: 'Space Mono', monospace; font-size: 12px; font-weight: 700; cursor: pointer; }
-        .sort-btn.active { background: var(--blue); color: #0a0e27; }
-        .no-results { grid-column: 1 / -1; text-align: center; color: var(--text2); font-size: 13px; padding: 30px 0; }
+  .card{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;cursor:pointer;transition:.15s}
+  .card:hover{border-color:var(--blue)}
+  .card-top{display:flex;justify-content:space-between;gap:8px;align-items:center}
+  .card-id{font-size:11px;color:var(--text2)}
+  .card-desc{font-size:14px;font-weight:700;margin:6px 0;line-height:1.35;overflow-wrap:anywhere}
+  .badge{display:inline-block;padding:3px 10px;border-radius:4px;font-size:11px;font-weight:700;white-space:nowrap}
+  .s-dispatched{background:rgba(255,107,107,.18);color:var(--red);border:1px solid var(--red)}
+  .s-in_progress{background:rgba(255,217,61,.18);color:var(--yellow);border:1px solid var(--yellow)}
+  .s-finished{background:rgba(45,122,79,.25);color:#9fe3b8;border:1px solid var(--darkgreen)}
+  .s-closed{background:rgba(107,207,127,.18);color:var(--green);border:1px solid var(--green)}
+  .s-waiting{background:rgba(116,185,255,.15);color:var(--blue);border:1px solid var(--blue)}
+  .s-other{background:rgba(45,58,95,.4);color:var(--text2);border:1px solid var(--border)}
 
-        /* ── Location columns ── */
-        .location-list { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-        .location-column { display: flex; flex-direction: column; gap: 8px; max-height: calc(100vh - 310px); overflow-y: auto; }
-        .location-column::-webkit-scrollbar { width: 0; height: 0; }
-        .location-column { scrollbar-width: none; -ms-overflow-style: none; }
-        .column-header { font-size: 12px; font-weight: 700; color: var(--text2); padding: 8px 0; border-bottom: 2px solid var(--border); margin-bottom: 4px; }
+  .empty{text-align:center;color:var(--text2);font-size:13px;padding:40px 0}
 
-        /* ── Location cards ── */
-        .card { background: var(--bg2); border: 2px solid var(--border); border-radius: 8px; padding: 12px; cursor: pointer; transition: all 0.2s; }
-        .card:hover { border-color: var(--blue); transform: translateY(-1px); }
-        .card-name { font-size: 15px; font-weight: 700; margin-bottom: 6px; line-height: 1.3; }
-        .card-addr { font-size: 12px; color: var(--text2); margin-bottom: 8px; line-height: 1.4; }
-        .card-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-        .ticket-badge { display: inline-block; padding: 3px 10px; border-radius: 4px; font-size: 11px; font-weight: 700; }
-        .badge-open { background: rgba(116,185,255,0.15); color: var(--blue); border: 1px solid var(--blue); }
-        .badge-none { background: rgba(45,58,95,0.4); color: var(--text2); border: 1px solid var(--border); }
-        .badge-status { display: inline-block; padding: 3px 10px; border-radius: 4px; font-size: 11px; font-weight: 700; }
-        .status-red       { background: rgba(255,107,107,0.2);  color: var(--red);       border: 1px solid var(--red); }
-        .status-yellow    { background: rgba(255,217,61,0.2);   color: var(--yellow);    border: 1px solid var(--yellow); }
-        .status-darkgreen { background: rgba(45,122,79,0.2);    color: var(--darkgreen); border: 1px solid var(--darkgreen); }
-        .status-green     { background: rgba(107,207,127,0.2);  color: var(--green);     border: 1px solid var(--green); }
-        .status-blue      { background: rgba(116,185,255,0.2);  color: var(--blue);      border: 1px solid var(--blue); }
-        .status-purple    { background: rgba(168,85,247,0.2);   color: var(--purple);    border: 1px solid var(--purple); }
+  /* modal */
+  .modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:1000;align-items:flex-start;justify-content:center;padding:0;overflow:auto;-webkit-overflow-scrolling:touch}
+  .modal.on{display:flex}
+  .sheet{background:var(--bg);border:1px solid var(--border);border-radius:12px;max-width:620px;width:100%;margin:18px;min-height:min-content}
+  @media(max-width:699px){.sheet{margin:0;border-radius:0;min-height:100dvh}}
+  .sheet-h{position:sticky;top:0;background:var(--bg);border-bottom:1px solid var(--border);padding:14px;display:flex;justify-content:space-between;align-items:center;z-index:1}
+  .sheet-h h2{font-size:16px}
+  .x{background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:8px 14px;font-family:inherit;font-weight:700;cursor:pointer}
+  .sheet-b{padding:14px}
+  .field-label{font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin:14px 0 6px}
+  .val{font-size:14px;line-height:1.5;overflow-wrap:anywhere;white-space:pre-wrap}
+  .photo-grid{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+  .photo-grid img{width:84px;height:84px;object-fit:cover;border-radius:6px;border:1px solid var(--border);cursor:pointer}
 
-        /* ── Leaflet popup ── */
-        .leaflet-popup-content-wrapper { background: var(--bg); color: var(--text); border: 2px solid var(--border); border-radius: 12px; font-family: 'Space Mono', monospace; }
-        .leaflet-popup-content { margin: 0; width: 370px !important; }
+  .status-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+  .status-btn{flex:1 1 calc(50% - 8px);min-width:120px;padding:11px;border-radius:8px;border:2px solid var(--border);background:var(--bg2);color:var(--text);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer}
+  .status-btn.cur{border-color:currentColor}
+  .status-btn.b-dispatched{color:var(--red)} .status-btn.b-in_progress{color:var(--yellow)}
+  .status-btn.b-finished{color:#9fe3b8} .status-btn.b-closed{color:var(--green)}
 
-        /* ── Panel (popup + modal body) ── */
-        .panel { padding: 16px; }
-        .panel-title { font-size: 16px; font-weight: 700; margin-bottom: 4px; line-height: 1.3; }
-        .panel-addr { font-size: 13px; color: var(--text2); margin-bottom: 14px; cursor: pointer; text-decoration: underline; line-height: 1.4; }
-        .panel-addr:hover { color: var(--blue); }
-
-        /* ── Closed ticket section (collapsible, holds full editor) ── */
-        .history-section { margin-bottom: 14px; }
-        .history-header { font-size: 11px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
-        .closed-ticket { background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; margin-bottom: 6px; overflow: hidden; }
-        .closed-ticket-header { padding: 10px 12px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-        .closed-ticket-header:hover { background: rgba(255,255,255,0.03); }
-        .closed-ticket-label { font-size: 12px; font-weight: 700; color: var(--text2); min-width: 0; overflow-wrap: anywhere; }
-        .closed-ticket-header > .badge-status { flex-shrink: 0; }
-        .closed-ticket-body { display: none; padding: 4px 8px 8px; border-top: 1px solid var(--border); }
-        .closed-ticket-body.open { display: block; }
-        /* When the editor sits inside a closed wrapper, soften its frame so the
-           wrapper provides the border instead of doubling up. */
-        .closed-ticket-body .active-ticket-section { border-color: var(--border); margin-bottom: 4px; }
-        .closed-editor { opacity: 0.97; }
-        .closed-editor .active-ticket-label { color: var(--green); }
-
-        /* ── Active ticket ── */
-        .active-ticket-section { background: var(--bg3); border: 1px solid var(--blue); border-radius: 8px; padding: 14px; margin-bottom: 12px; }
-        .active-ticket-label { font-size: 11px; font-weight: 700; color: var(--blue); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; }
-
-        /* ── Notes list (saved notes in active ticket) ── */
-        .notes-list { margin-bottom: 10px; }
-        .note-item { background: var(--bg2); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; margin-bottom: 6px; }
-        .note-item-date { font-size: 10px; color: var(--text2); margin-bottom: 3px; }
-        .note-item-text { font-size: 12px; line-height: 1.4; margin-bottom: 4px; overflow-wrap: anywhere; white-space: pre-wrap; }
-        .note-item-photo img { width: 100%; max-height: 140px; object-fit: cover; border-radius: 4px; border: 1px solid var(--border); cursor: pointer; margin-top: 4px; }
-
-        /* ── Add note area ── */
-        .add-note-area { background: var(--bg2); border: 1px solid var(--border); border-radius: 6px; padding: 10px; margin-bottom: 10px; }
-        .add-note-label { font-size: 10px; font-weight: 700; color: var(--text2); text-transform: uppercase; margin-bottom: 6px; }
-        .add-note-textarea { width: 100%; background: transparent; border: none; color: var(--text); font-family: 'Space Mono', monospace; font-size: 13px; resize: vertical; min-height: 50px; outline: none; }
-        .add-note-photo-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
-        .add-note-photo-btn { font-size: 11px; padding: 4px 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text2); cursor: pointer; font-family: 'Space Mono', monospace; }
-        .add-note-photo-btn:hover { border-color: var(--blue); color: var(--blue); }
-        .note-photo-preview { width: 48px; height: 48px; object-fit: cover; border-radius: 4px; border: 1px solid var(--border); cursor: pointer; }
-        .note-photo-clear { font-size: 11px; color: var(--red); cursor: pointer; background: none; border: none; font-family: 'Space Mono', monospace; }
-        .upload-status { font-size: 11px; color: var(--text2); }
-
-        /* ── Multi-photo thumbnails ── */
-        .note-photo-grid { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
-        .note-photo-grid img { width: 72px; height: 72px; object-fit: cover; border-radius: 4px; border: 1px solid var(--border); cursor: pointer; }
-        .pdf-tile { display: inline-flex; align-items: center; justify-content: center; width: 72px; height: 72px; border-radius: 4px; border: 1px solid var(--border); background: var(--bg2); color: var(--blue); font-size: 11px; font-weight: 700; text-decoration: none; }
-        .pdf-tile:hover { border-color: var(--blue); }
-        .invoice-tag { color: var(--yellow); font-weight: 700; font-size: 10px; margin-left: 6px; }
-        .note-invoice { border-color: var(--yellow) !important; }
-        .preview-thumb-wrap { position: relative; display: inline-block; }
-        .preview-thumb-wrap .thumb-remove { position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; line-height: 16px; text-align: center; background: var(--red); color: #0a0e27; border: none; border-radius: 50%; font-size: 11px; font-weight: 700; cursor: pointer; padding: 0; }
-        .preview-grid { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
-
-        /* ── Draggable notes ── */
-        .note-item.draggable { cursor: grab; display: flex; gap: 8px; align-items: flex-start; }
-        .note-item.draggable:active { cursor: grabbing; }
-        .note-drag-handle { color: var(--text2); font-size: 14px; padding-top: 2px; user-select: none; flex-shrink: 0; }
-        .note-item-content { flex: 1; min-width: 0; }
-        .note-item.drag-over { border-color: var(--blue); box-shadow: 0 0 0 1px var(--blue); }
-        .note-item.dragging { opacity: 0.4; }
-
-        /* ── Forms ── */
-        .form-group { margin-bottom: 12px; }
-        .form-label { font-size: 12px; font-weight: 700; color: var(--text2); margin-bottom: 4px; display: block; }
-        .form-input, .form-select, .form-textarea { width: 100%; background: var(--bg2); border: 2px solid var(--border); border-radius: 6px; padding: 10px; color: var(--text); font-family: 'Space Mono', monospace; font-size: 14px; }
-        .form-textarea { min-height: 60px; resize: vertical; }
-
-        /* ── Buttons ── */
-        .btn-group { display: flex; gap: 8px; }
-        .btn { flex: 1; min-width: 0; padding: 10px 8px; border: none; border-radius: 6px; font-family: 'Space Mono', monospace; font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .btn-primary   { background: var(--blue); color: #0a0e27; }
-        .btn-secondary { background: var(--bg2); color: var(--text); border: 2px solid var(--border); }
-        .btn-success   { background: var(--green); color: #0a0e27; }
-        .btn-danger    { background: rgba(255,107,107,0.15); color: var(--red); border: 2px solid var(--red); flex: 0 0 auto; padding: 10px 14px; }
-        .btn-new-ticket { width: 100%; padding: 12px; border: 2px dashed var(--border); border-radius: 8px; background: transparent; color: var(--text2); font-family: 'Space Mono', monospace; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s; margin-bottom: 4px; }
-        .btn-new-ticket:hover { border-color: var(--blue); color: var(--blue); }
-
-        /* ── Divider ── */
-        .section-divider { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
-
-        /* ── Mobile modal ── */
-        .mobile-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10000; align-items: center; justify-content: center; padding: 20px; }
-        .mobile-modal.active { display: flex; }
-        .modal-content { background: var(--bg); border: 2px solid var(--border); border-radius: 12px; max-width: 500px; width: 100%; max-height: 90vh; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
-        .modal-close { position: sticky; top: 0; background: var(--bg); padding: 12px; border-bottom: 2px solid var(--border); text-align: right; z-index: 1; }
-        .modal-close button { background: var(--bg2); color: var(--text); border: 2px solid var(--border); padding: 10px 18px; border-radius: 6px; font-family: 'Space Mono', monospace; font-size: 15px; font-weight: 700; cursor: pointer; }
-
-        /* ── Scroll to top ── */
-        .scroll-top-btn { display: none; }
-
-        /* ── Responsive ── */
-        @media (max-width: 1200px) and (min-width: 700px) {
-            .container { grid-template-columns: 1fr 340px; }
-            .stat { padding: 8px 4px; }
-            .stat-num { font-size: 18px; }
-            .stat-label { font-size: 8px; }
-            .card-name { font-size: 13px; }
-            .card-addr { font-size: 11px; }
-        }
-
-        /* Stat boxes: below ~560px, 5-across is too tight and labels clip.
-           Switch to a flex wrap so they form a tidy 3 + 2 grid that grows
-           with the screen instead of being crushed. */
-        @media (max-width: 560px) {
-            .stats { display: flex; flex-wrap: wrap; gap: 8px; }
-            .stat { flex: 1 1 calc(33.333% - 8px); min-width: 90px; padding: 10px 6px; }
-            .stat-num { font-size: 20px; }
-            .stat-label { font-size: 8px; }
-        }
-
-        /* Very narrow phones (≤380px): the 3-button action row can't fit
-           "Close Ticket" on one line, so stack the buttons full-width. */
-        @media (max-width: 380px) {
-            .active-ticket-section .btn-group { flex-direction: column; }
-            .active-ticket-section .btn-group .btn { width: 100%; flex: 1 1 auto; }
-            .active-ticket-section .btn-danger { padding: 10px; }
-        }
-
-        @media (max-width: 699px) and (orientation: portrait) {
-            /* Let the whole page scroll as one surface instead of trapping
-               scroll inside nested overflow containers (the main cause of the
-               "hard to scroll" complaint). */
-            html, body { height: auto; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain; }
-            .container { display: block; height: auto; }
-            .map-section { display: none; }
-            .sidebar { width: 100%; height: auto; min-height: 100vh; overflow: visible; padding: 14px; }
-
-            /* Single column on phones — wider cards, bigger tap targets,
-               and no inner scroll region to fight the page scroll. */
-            .location-list { grid-template-columns: 1fr; gap: 18px; }
-            .location-column { max-height: none; overflow: visible; gap: 10px; }
-            .card { padding: 14px; }
-            .card-name { font-size: 16px; }
-            .card-addr { font-size: 13px; }
-
-            /* Keep search + sort reachable while scrolling. */
-            .controls-bar { position: sticky; top: 0; z-index: 50; background: var(--bg); padding: 8px 0; margin-bottom: 10px; flex-wrap: wrap; }
-            .search-input { min-width: 0; }
-
-            .scroll-top-btn { display: block; position: fixed; bottom: 20px; right: 20px; width: 56px; height: 56px; background: var(--blue); color: white; border: none; border-radius: 50%; font-size: 24px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 12px rgba(59,130,246,0.5); z-index: 9999; }
-        }
-
-        /* Phone-sized modal (covers both orientations since landscape phones
-           use the modal too). Trim chrome so nothing is cut off. */
-        @media (max-width: 699px) {
-            .mobile-modal { padding: 0; }
-            .modal-content { max-width: 100%; max-height: 100vh; max-height: 100dvh; height: 100vh; height: 100dvh; border-radius: 0; border: none; }
-            .panel { padding: 12px; }
-        }
-
-        @media (max-width: 699px) and (orientation: landscape) {
-            .container { display: block; }
-            .sidebar { display: none; }
-            .map-section { width: 100%; height: 100vh; }
-            #map { height: 100vh; }
-        }
-    </style>
+  .cmts{display:flex;flex-direction:column;gap:8px;margin-top:6px}
+  .cmt{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:9px 11px}
+  .cmt-meta{font-size:10px;color:var(--text2);margin-bottom:3px}
+  .cmt-text{font-size:13px;line-height:1.4;overflow-wrap:anywhere;white-space:pre-wrap}
+  textarea.cmt-in{width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:13px;padding:10px;min-height:60px;resize:vertical;outline:none}
+  textarea.cmt-in:focus{border-color:var(--blue)}
+  .btn{padding:10px 14px;border:none;border-radius:8px;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer}
+  .btn-primary{background:var(--blue);color:#0a0e27}
+  .btn[disabled]{opacity:.5;cursor:default}
+  .spin{display:inline-block;width:13px;height:13px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite;vertical-align:middle}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:11px 18px;font-size:13px;z-index:2000;opacity:0;transition:.2s;pointer-events:none}
+  .toast.on{opacity:1}
+  .toast.err{border-color:var(--red);color:var(--red)}
+  .lightbox{display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:3000;align-items:center;justify-content:center;padding:20px}
+  .lightbox.on{display:flex}
+  .lightbox img{max-width:100%;max-height:100%;border-radius:8px}
+</style>
 </head>
 <body>
-    <div class="container">
-        <div class="map-section"><div id="map"></div></div>
-        <div class="sidebar">
-            <h2>DPM AWT Job Tracker v1.6</h2>
-            <div class="stats">
-                <div class="stat" onclick="window.filterByStatus('red')">        <div class="stat-num" style="color:var(--red)"       id="stat-red">0</div>       <div class="stat-label">Not Started</div></div>
-                <div class="stat" onclick="window.filterByStatus('yellow')">     <div class="stat-num" style="color:var(--yellow)"    id="stat-yellow">0</div>    <div class="stat-label">In Progress</div></div>
-                <div class="stat" onclick="window.filterByStatus('darkgreen')">  <div class="stat-num" style="color:var(--darkgreen)" id="stat-darkgreen">0</div> <div class="stat-label">Done &amp; Unpaid</div></div>
-                <div class="stat" onclick="window.filterByStatus('none')">       <div class="stat-num" style="color:var(--green)"     id="stat-none">0</div>      <div class="stat-label">Paid</div></div>
-            </div>
-            <div class="controls-bar">
-                <input type="text" id="search-input" class="search-input" placeholder="🔍 Search name, number, or address…" oninput="window.onSearch(this.value)">
-                <div class="sort-toggle">
-                    <button id="sort-number" class="sort-btn active" onclick="window.setSort('number')">By #</button>
-                    <button id="sort-alpha"  class="sort-btn"        onclick="window.setSort('alpha')">A–Z</button>
-                </div>
-            </div>
-            <div class="location-list" id="list"></div>
+<div class="wrap">
+  <header>
+    <div><h1 id="boardTitle">Job Board</h1><div class="sub" id="boardSub">loading…</div></div>
+    <div class="poll" id="poll">·</div>
+  </header>
+  <div class="stats" id="stats"></div>
+  <div class="controls">
+    <input class="search" id="search" placeholder="🔍 Search store, number, or job…" oninput="onSearch(this.value)">
+  </div>
+  <div id="list"><div class="empty">Loading…</div></div>
+</div>
+
+<div class="modal" id="modal"><div class="sheet" id="sheet"></div></div>
+<div class="lightbox" id="lightbox" onclick="this.classList.remove('on')"><img id="lightboxImg" src="" alt=""></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ════════════════════════════════════════════════════════════════════════
+   GENERIC VENDOR JOB BOARD  (external, third-party facing)
+
+   ── ONE SOURCE OF TRUTH ──────────────────────────────────────────────────
+   This board does NOT own any tickets. Jobs live in ONE place: the
+   `maintenanceTickets` node, owned and created by the internal RM-Tracker.
+   A job appears on this board purely because its `assignedVendorId` equals
+   this board's VENDOR_ID. The board reads those tickets and writes status +
+   comments back to the SAME record. No mirror node, no copies, no reconcile.
+
+   ── SCALE ────────────────────────────────────────────────────────────────
+   The board fetches ONLY its slice via  GET ...?vendor=<VENDOR_ID>  which
+   returns just this vendor's tickets + a trimmed restaurants map. As stores
+   and tickets grow, per-load payload stays proportional to THIS vendor's
+   work, not the whole company.
+
+   ── MAKING ANOTHER VENDOR BOARD ──────────────────────────────────────────
+   Copy this file and change VENDOR_ID (and the title). Nothing else.
+   The vendor's id is the key under maintenanceVendors in the master DB.
+
+   ── STATUS MODEL (single canonical status, no second field) ───────────────
+   The ticket's `status` is RM's canonical value. This board only exposes the
+   subset a vendor drives, with vendor-friendly labels:
+       canonical `status`     vendor label
+       dispatched             Not Started
+       in_progress            In Progress
+       finished               Done & Unpaid
+       closed                 Paid
+   The board writes the canonical value back, so RM and every other view stay
+   consistent automatically — there is nothing to reconcile.
+
+   ── TIME ──────────────────────────────────────────────────────────────────
+   Epoch milliseconds (Date.now()) everywhere, matching RM-Tracker exactly.
+   ════════════════════════════════════════════════════════════════════════ */
+
+// ── Board identity: the only thing that changes per vendor board ──
+const VENDOR_ID = "AWT";   // ← set to the maintenanceVendors key for this board
+
+const API_BASE_URL = "https://alignment-api-khaki.vercel.app/api/dpm-alignment";
+const WRITE_PASSWORD = "vendor123";   // ROLES.VENDOR on the API
+const POLL_MS = 20000;
+
+// canonical status -> vendor label (only the statuses a vendor acts on)
+const VENDOR_STATUS = {
+  dispatched:  { label:"Not Started",   cls:"s-dispatched"  },
+  in_progress: { label:"In Progress",   cls:"s-in_progress" },
+  finished:    { label:"Done & Unpaid", cls:"s-finished"    },
+  closed:      { label:"Paid",          cls:"s-closed"      },
+};
+// statuses a vendor can switch between, in order
+const VENDOR_FLOW = ["dispatched","in_progress","finished","closed"];
+// any other canonical status (waiting, assigned…) is shown read-only:
+function statusView(s){
+  if(VENDOR_STATUS[s]) return VENDOR_STATUS[s];
+  if(s==="waiting") return {label:"On Hold",cls:"s-waiting"};
+  return {label:(s||"—").replace(/_/g," "),cls:"s-other"};
+}
+
+// ── State ──
+let TICKETS={}, RESTAURANTS={}, VENDOR=null;
+let curFilter=null, curSearch="";
+let openId=null;
+
+// ── Time (matches RM exactly) ──
+function now(){ return Date.now(); }
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+function fmtDate(ts){ if(!ts) return "—"; const d=new Date(ts);
+  return d.toLocaleDateString("en-US",{month:"short",day:"numeric"})+" · "+d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}); }
+
+const $=id=>document.getElementById(id);
+function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+function toast(msg,kind){const t=$("toast");t.textContent=msg;t.className="toast on"+(kind==="err"?" err":"");setTimeout(()=>t.className="toast",2200)}
+
+// ── Data layer ──
+async function apiGet(){
+  const r=await fetch(`${API_BASE_URL}?vendor=${encodeURIComponent(VENDOR_ID)}`,{cache:"no-store"});
+  if(!r.ok) throw new Error("Could not reach the server");
+  return await r.json();
+}
+// Write a single ticket back. Sends vendorId so the API can verify ownership.
+async function apiWriteTicket(id,ticket){
+  const updates={}; updates[`maintenanceTickets/${id}`]=ticket;
+  const r=await fetch(API_BASE_URL,{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({password:WRITE_PASSWORD,vendorId:VENDOR_ID,updates})});
+  if(!r.ok){let m="Write failed";try{m=(await r.json()).error||m}catch(e){}throw new Error(m)}
+}
+
+async function load(){
+  const data=await apiGet();
+  TICKETS=data.maintenanceTickets||{};
+  RESTAURANTS=data.restaurants||{};
+  VENDOR=data.vendor||null;
+  $("boardTitle").textContent=(VENDOR&&VENDOR.name?VENDOR.name:VENDOR_ID)+" Job Board";
+  $("boardSub").textContent=Object.keys(TICKETS).length+" jobs · "+Object.keys(RESTAURANTS).length+" stores";
+}
+
+// ── Render ──
+function storeName(sid){return (RESTAURANTS[sid]&&RESTAURANTS[sid].storeName)||"Unknown store"}
+function storeNum(sid){return (RESTAURANTS[sid]&&RESTAURANTS[sid].storeNumber)||""}
+function storeAddr(sid){return (RESTAURANTS[sid]&&RESTAURANTS[sid].address)||""}
+
+function ticketsArray(){
+  return Object.entries(TICKETS).map(([id,t])=>({_id:id,...t}));
+}
+
+function renderStats(){
+  const counts={dispatched:0,in_progress:0,finished:0,closed:0};
+  ticketsArray().forEach(t=>{ if(counts[t.status]!==undefined) counts[t.status]++; });
+  const order=["dispatched","in_progress","finished","closed"];
+  $("stats").innerHTML=order.map(s=>{
+    const v=VENDOR_STATUS[s];
+    const on=curFilter===s?" active":"";
+    return `<div class="stat${on}" onclick="toggleFilter('${s}')">
+      <div class="stat-num" style="color:var(--${s==='dispatched'?'red':s==='in_progress'?'yellow':s==='finished'?'darkgreen':'green'})">${counts[s]}</div>
+      <div class="stat-label">${esc(v.label)}</div></div>`;
+  }).join("");
+}
+
+function render(){
+  renderStats();
+  let arr=ticketsArray();
+  if(curFilter) arr=arr.filter(t=>t.status===curFilter);
+  if(curSearch){
+    const q=curSearch.toLowerCase();
+    arr=arr.filter(t=>{
+      const hay=`${storeName(t.storeId)} ${storeNum(t.storeId)} ${storeAddr(t.storeId)} ${t.description||""} ${t.shortId||""}`.toLowerCase();
+      return hay.includes(q);
+    });
+  }
+  const list=$("list");
+  if(!arr.length){ list.innerHTML=`<div class="empty">No jobs${curFilter||curSearch?" match this view":" assigned yet"}.</div>`; return; }
+
+  // group by store
+  const byStore={};
+  arr.forEach(t=>{ (byStore[t.storeId]=byStore[t.storeId]||[]).push(t); });
+  const storeIds=Object.keys(byStore).sort((a,b)=>{
+    const na=parseInt(String(storeNum(a)).replace(/\D/g,""))||0, nb=parseInt(String(storeNum(b)).replace(/\D/g,""))||0;
+    if(na&&nb) return na-nb;
+    return storeName(a).localeCompare(storeName(b));
+  });
+  list.innerHTML=storeIds.map(sid=>{
+    const cards=byStore[sid].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)).map(t=>{
+      const v=statusView(t.status);
+      return `<div class="card" onclick="openTicket('${t._id}')">
+        <div class="card-top">
+          <span class="card-id">#${esc(t.shortId||t._id.slice(0,6))}</span>
+          <span class="badge ${v.cls}">${esc(v.label)}</span>
         </div>
-    </div>
-
-    <div class="mobile-modal" id="modal">
-        <div class="modal-content">
-            <div class="modal-close"><button onclick="window.closeModal()">✕ Close</button></div>
-            <div id="modal-body"></div>
-        </div>
-    </div>
-
-    <button class="scroll-top-btn" onclick="window.scrollToTop()">↑</button>
-
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script type="module">
-        // ─────────────────────────────────────────
-        // Data layer — all reads & writes go through the DPM master API.
-        // No direct Firebase SDK connection. Reads are fetch-on-load and
-        // refetch-after-write (no live push updates).
-        // ─────────────────────────────────────────
-        const API_BASE_URL  = "https://alignment-api-khaki.vercel.app/api/dpm-alignment";
-        const EDIT_PASSWORD = "awt123";
-        const TICKETS_NODE  = "awtTickets";   // top-level node this app owns
-
-        // Cache of the last full GET payload, so the get() shim can read
-        // synchronously-ish from memory the way the old SDK get() did.
-        let _dbCache = {};
-
-        // Pull the whole master DB once. We only use the slices we need
-        // (restaurants for locations, awtTickets for ticket data).
-        async function fetchAll() {
-            const resp = await fetch(API_BASE_URL);
-            if (!resp.ok) throw new Error("Network response was not ok");
-            _dbCache = (await resp.json()) || {};
-            return _dbCache;
-        }
-
-        // Path helper — kept named ref() so existing call sites are unchanged.
-        // The first arg (formerly a Firebase db handle) is ignored.
-        function ref(_db, path) { return path; }
-
-        // Read a node from the cached payload by slash path, e.g.
-        // get(ref(db,'awtTickets')) or get(ref(dbLocs,'restaurants')).
-        // Returns a Firebase-snapshot-like object with .val().
-        async function get(path) {
-            // Always refresh the cache on an explicit get so we have current data.
-            await fetchAll();
-            const parts = String(path).split('/').filter(Boolean);
-            let node = _dbCache;
-            for (const p of parts) {
-                node = (node && typeof node === 'object') ? node[p] : undefined;
-            }
-            return { val: () => (node === undefined ? null : node) };
-        }
-
-        // Write a node by slash path. Passing value === null deletes it.
-        // Mirrors the old set(ref(db,path), value) signature.
-        async function set(path, value) {
-            const updates = {};
-            updates[String(path)] = (value === undefined ? null : value);
-            const resp = await fetch(API_BASE_URL, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ password: EDIT_PASSWORD, updates })
-            });
-            if (!resp.ok) {
-                let msg = "API Write Error";
-                try { msg = (await resp.json()).error || msg; } catch (e) {}
-                throw new Error(msg);
-            }
-            // Keep the local cache coherent so the next render reflects the write.
-            applyLocalWrite(String(path), value);
-            return resp;
-        }
-
-        // Apply a write to the in-memory cache so UI refreshes immediately
-        // without waiting for a fresh full GET.
-        function applyLocalWrite(path, value) {
-            const parts = path.split('/').filter(Boolean);
-            if (parts.length === 0) return;
-            let node = _dbCache;
-            for (let i = 0; i < parts.length - 1; i++) {
-                const k = parts[i];
-                if (!node[k] || typeof node[k] !== 'object') node[k] = {};
-                node = node[k];
-            }
-            const leaf = parts[parts.length - 1];
-            if (value === null || value === undefined) delete node[leaf];
-            else node[leaf] = value;
-        }
-
-        const IMGBB_API_KEY = 'b733862d15744e2bfaa4329d122f4ba0';
-
-        // Legacy handles — kept only so existing ref(db,'…') / ref(dbLocs,'…')
-        // call sites stay valid. They are ignored by the ref() shim above.
-        const db = null, dbLocs = null;
-
-        // Will be populated dynamically
-        let locs = [];
-
-        // ─────────────────────────────────────────
-        // Map
-        // ─────────────────────────────────────────
-        const map = L.map('map').setView([32.9413343, -97.0731222], 10);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom:20, attribution:'© OpenStreetMap' }).addTo(map);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png', { maxZoom:20 }).addTo(map);
-
-        // ─────────────────────────────────────────
-        // State
-        // Firebase structure:
-        //   awtTickets/{locId}/tickets/{ticketId} = { ticketNo, s, v, issue, notes:[{n,t,photoUrls?,invoice?}], createdAt }
-        //   s is the single status: red|yellow|darkgreen|green(=Closed)
-        // ─────────────────────────────────────────
-        let data = {};
-        let markers = {};
-        let activeFilter = null;
-        let sortMode = 'number';   // 'number' | 'alpha' — global sort toggle
-        let searchQuery = '';      // search bar text (lowercased)
-
-        // ─────────────────────────────────────────
-        // Helpers
-        // ─────────────────────────────────────────
-        function locId(l) { return `${l.t}_${l.g}`.replace(/\./g, '_'); }
-        function newTicketId() { return 'tk_' + Date.now() + '_' + Math.random().toString(36).slice(2,6); }
-
-        // Single source of truth for a ticket's state is its status `s`.
-        // "green" now means CLOSED (it absorbed the old "Done & Paid").
-        // There is no separate archived flag — a ticket is closed iff s==='green'.
-        function statusLabel(s) {
-            return s==='red'?'Not Started':s==='yellow'?'In Progress':s==='darkgreen'?'Done & Unpaid':s==='green'?'Paid':'No Issues';
-        }
-
-        function statusColor(s) {
-            return s==='red'?'#ff6b6b':s==='yellow'?'#ffd93d':s==='darkgreen'?'#2d7a4f':s==='green'?'#6bcf7f':'#74b9ff';
-        }
-
-        function isClosed(t) { return (t?.s) === 'green'; }
-
-        // Normalize a note's photos into an array, supporting both the
-        // legacy single `photoUrl` field and the new `photoUrls` array.
-        function notePhotos(n) {
-            if(Array.isArray(n.photoUrls) && n.photoUrls.length) return n.photoUrls;
-            if(n.photoUrl) return [n.photoUrl];
-            return [];
-        }
-
-        // Open (non-closed) tickets for a location, oldest first.
-        function getOpenTickets(locData) {
-            if(!locData?.tickets) return [];
-            return Object.entries(locData.tickets)
-                .filter(([id, t]) => !isClosed(t))
-                .map(([id, t]) => ({ id, ...t }))
-                .sort((a, b) => (a.createdAt||'').localeCompare(b.createdAt||''));
-        }
-
-        // Closed tickets for a location, oldest first.
-        function getClosedTickets(locData) {
-            if(!locData?.tickets) return [];
-            return Object.entries(locData.tickets)
-                .filter(([id, t]) => isClosed(t))
-                .map(([id, t]) => ({ id, ...t }))
-                .sort((a, b) => (a.createdAt||'').localeCompare(b.createdAt||''));
-        }
-
-        // Urgency ranking so the marker reflects the "worst" open status
-        // when several tickets are open: red > yellow > darkgreen > blue.
-        const STATUS_URGENCY = { red:5, yellow:4, darkgreen:3, green:2, blue:1 };
-        function mostUrgentStatus(tickets) {
-            let best = null, bestRank = -1;
-            tickets.forEach(t => {
-                const r = STATUS_URGENCY[t.s || 'blue'] || 0;
-                if(r > bestRank) { bestRank = r; best = t.s || 'blue'; }
-            });
-            return best;
-        }
-
-        function getSortedTickets(locData) {
-            if(!locData?.tickets) return [];
-            return Object.entries(locData.tickets)
-                .map(([id, t]) => ({id, ...t}))
-                .sort((a, b) => (a.createdAt||'').localeCompare(b.createdAt||''));
-        }
-
-        function getMarkerColor(locData) {
-            const opens = getOpenTickets(locData);
-            if(opens.length > 0) return statusColor(mostUrgentStatus(opens) || 'blue');
-            if(locData?.tickets && Object.keys(locData.tickets).length > 0) return '#4a5568'; // only closed tickets
-            return '#74b9ff'; // no tickets at all
-        }
-
-        // ─────────────────────────────────────────
-        // One-time migration: collapse the old two-field model (s + archived)
-        // into the single-status model. Any ticket with archived:true becomes
-        // status "green" (Closed); the archived/archivedAt fields are removed.
-        // Runs on load; only writes tickets that actually need fixing.
-        // ─────────────────────────────────────────
-        async function migrateArchivedToClosed() {
-            const writes = [];
-            for(const [lid, loc] of Object.entries(data || {})) {
-                for(const [tkId, t] of Object.entries(loc?.tickets || {})) {
-                    if(t && (t.archived !== undefined || t.archivedAt !== undefined)) {
-                        const fixed = { ...t };
-                        if(t.archived === true) fixed.s = 'green';   // was closed → Closed status
-                        delete fixed.archived;
-                        delete fixed.archivedAt;
-                        writes.push(set(ref(db, `awtTickets/${lid}/tickets/${tkId}`), fixed));
-                    }
-                }
-            }
-            if(writes.length) {
-                try { await Promise.all(writes); console.log(`Migrated ${writes.length} ticket(s) to single-status model.`); }
-                catch(e) { console.warn('Migration write failed:', e.message); }
-            }
-        }
-
-        // ─────────────────────────────────────────
-        // Stats
-        // ─────────────────────────────────────────
-        function getEffectiveStatus(locData) {
-            // Most urgent OPEN ticket wins. If none open, fall back to the most
-            // recent closed ticket's status (which will be 'green'/Closed).
-            const opens = getOpenTickets(locData);
-            if(opens.length > 0) return mostUrgentStatus(opens) || 'blue';
-            const all = getSortedTickets(locData);
-            if(all.length > 0) return all[all.length - 1].s || 'blue';
-            return 'none';
-        }
-
-        function updateStats() {
-            const counts = { red:0, yellow:0, darkgreen:0 };
-            let closedTickets = 0;
-            locs.forEach(l => {
-                if(l.special) return;
-                const d = data[locId(l)];
-                // The three "active" boxes count locations by their most urgent
-                // OPEN status (red / yellow / darkgreen). Green = Closed, handled below.
-                const opens = getOpenTickets(d);
-                if(opens.length) {
-                    const s = mostUrgentStatus(opens);
-                    if(counts[s] !== undefined) counts[s]++;
-                }
-                // "Closed" counts closed (green) tickets across all stores.
-                closedTickets += getClosedTickets(d).length;
-            });
-            document.getElementById('stat-red').textContent       = counts.red;
-            document.getElementById('stat-yellow').textContent    = counts.yellow;
-            document.getElementById('stat-darkgreen').textContent = counts.darkgreen;
-            document.getElementById('stat-none').textContent      = closedTickets;
-        }
-
-        // ─────────────────────────────────────────
-        // Filter
-        // ─────────────────────────────────────────
-        window.filterByStatus = function(status) {
-            if(activeFilter === status) {
-                activeFilter = null;
-                document.querySelectorAll('.stat').forEach(s => s.style.opacity = '1');
-            } else {
-                activeFilter = status;
-                document.querySelectorAll('.stat').forEach(s => s.style.opacity = '0.3');
-                const idx = {red:0, yellow:1, darkgreen:2, none:3};
-                if(idx[status] !== undefined) document.querySelectorAll('.stat')[idx[status]].style.opacity = '1';
-            }
-            applyCardVisibility();
-        };
-
-        // ─────────────────────────────────────────
-        // Sidebar list
-        // ─────────────────────────────────────────
-        function renderList() {
-            const ff=[], cs=[], specialFF=[], specialCS=[];
-            locs.forEach(l => {
-                if(l.special) {
-                    (l.n.includes('DPM') ? specialFF : specialCS).push(l);
-                } else if(l.n.includes('Burger King') || l.n.includes('Subway')) {
-                    ff.push(l);
-                } else {
-                    cs.push(l);
-                }
-            });
-
-            // Alphabetical comparator (ignores chain prefix + leading "The ")
-            const alphaCmp = (a, b) => {
-                const clean = n => { let x=n.replace('Burger King ','').replace('Subway ',''); if(x.startsWith('The ')) x=x.substring(4); return x; };
-                return clean(a.n).localeCompare(clean(b.n));
-            };
-            // By-number comparator (uses store number when present; falls back to alpha)
-            const numCmp = (a, b) => {
-                const gn = n => { const m = n.match(/#(\d+)/); return m ? parseInt(m[1]) : null; };
-                const an = gn(a.n), bn = gn(b.n);
-                if(an !== null && bn !== null) return an - bn;
-                if(an !== null) return -1; if(bn !== null) return 1;
-                return alphaCmp(a, b);
-            };
-            const cmp = (sortMode === 'alpha') ? alphaCmp : numCmp;
-            ff.sort(cmp);
-            cs.sort(cmp);
-
-            const mkCard = l => {
-                const lid = locId(l);
-                const c = document.createElement('div');
-                c.className = 'card';
-
-                if(l.special) {
-                    c.dataset.special = '1';
-                    c.innerHTML = `<div class="card-name" style="color:var(--purple);">📍 ${l.n}</div><div class="card-addr" style="cursor:pointer;text-decoration:underline;" onclick="window.open('https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(l.a)}','_blank')">${l.a}</div>`;
-                    c.dataset.search = `${l.n} ${l.a}`.toLowerCase();
-                    c.style.borderColor = 'var(--purple)';
-                    c.onclick = () => map.setView([l.t, l.g], 15);
-                    return c;
-                }
-
-                const d = data[lid];
-                const opens = getOpenTickets(d);
-                const closed = getClosedTickets(d);
-                const all = getSortedTickets(d);
-                const closedCount = closed.length;
-
-                // Filter status reflects the most urgent OPEN ticket (the three
-                // active boxes). Cards with no open ticket carry no status.
-                const urgentOpen = opens.length ? mostUrgentStatus(opens) : null;
-                c.dataset.filterStatus = (urgentOpen && urgentOpen !== 'blue') ? urgentOpen : '';
-                // Flag for the "Closed" box: does this store have any closed tickets?
-                c.dataset.hasClosed = closedCount > 0 ? '1' : '';
-
-                // Card border reflects the most urgent open ticket's status
-                const urgent = urgentOpen;
-                c.style.borderColor = urgent ? statusColor(urgent) : 'var(--border)';
-
-                // Search index: name + number + address (lowercased) for the search bar
-                c.dataset.search = `${l.n} ${l.a}`.toLowerCase();
-
-                // Badge row
-                let metaHtml = '';
-                if(opens.length > 1) {
-                    // Multiple open tickets → show a count badge in the urgent color
-                    metaHtml = `<span class="badge-status status-${urgent}">${opens.length} open</span>`;
-                    if(closedCount > 0) {
-                        metaHtml += `<span class="ticket-badge badge-none" style="font-size:10px;">+${closedCount} paid</span>`;
-                    }
-                } else if(opens.length === 1) {
-                    const open = opens[0];
-                    metaHtml = `<span class="badge-status status-${open.s}">${statusLabel(open.s)}</span>`;
-                    if(open.ticketNo) {
-                        metaHtml += `<span class="ticket-badge badge-open" style="font-size:10px;">#${open.ticketNo}</span>`;
-                    }
-                    if(closedCount > 0) {
-                        metaHtml += `<span class="ticket-badge badge-none" style="font-size:10px;">+${closedCount} paid</span>`;
-                    }
-                } else if(closedCount > 0) {
-                    metaHtml = `<span class="badge-status status-green">Paid</span>`;
-                    if(closedCount > 1) {
-                        metaHtml += `<span class="ticket-badge badge-none" style="font-size:10px;">${closedCount} tickets</span>`;
-                    }
-                } else {
-                    metaHtml = `<span class="ticket-badge badge-none">No tickets</span>`;
-                }
-
-                c.innerHTML = `<div class="card-name">${l.n}</div><div class="card-addr">${l.a}</div><div class="card-meta">${metaHtml}</div>`;
-                c.onclick = () => {
-                    if(window.innerWidth <= 699) {
-                        openMobilePanel(l);
-                    } else {
-                        map.setView([l.t, l.g], 13);
-                        setTimeout(() => markers[lid]?.m.openPopup(), 100);
-                    }
-                };
-                return c;
-            };
-
-            const list = document.getElementById('list');
-            list.innerHTML = '';
-
-            const c1 = document.createElement('div');
-            c1.className = 'location-column';
-            c1.innerHTML = '<div class="column-header">Fast Food</div>';
-            specialFF.forEach(l => c1.appendChild(mkCard(l)));
-            ff.forEach(l => c1.appendChild(mkCard(l)));
-
-            const c2 = document.createElement('div');
-            c2.className = 'location-column';
-            c2.innerHTML = '<div class="column-header">C-Store</div>';
-            specialCS.forEach(l => c2.appendChild(mkCard(l)));
-            cs.forEach(l => c2.appendChild(mkCard(l)));
-
-            list.appendChild(c1);
-            list.appendChild(c2);
-
-            // Apply current search + status-filter visibility
-            applyCardVisibility();
-        }
-
-        // Show/hide cards based on the active status filter AND the search query.
-        function applyCardVisibility() {
-            let anyVisible = false;
-            document.querySelectorAll('.card').forEach(card => {
-                const isSpecial = card.dataset.special === '1';
-                let matchesFilter;
-                if(!activeFilter) {
-                    matchesFilter = true;
-                } else if(activeFilter === 'none') {
-                    // "Closed" box → stores that have at least one closed ticket
-                    matchesFilter = card.dataset.hasClosed === '1';
-                } else {
-                    matchesFilter = card.dataset.filterStatus === activeFilter;
-                }
-                const matchesSearch = !searchQuery || (card.dataset.search || '').includes(searchQuery);
-                // Special (office) cards only show when no status filter is active.
-                const show = matchesSearch && (isSpecial ? !activeFilter : matchesFilter);
-                card.style.display = show ? '' : 'none';
-                if(show && !isSpecial) anyVisible = true;
-            });
-
-            document.querySelectorAll('.no-results').forEach(n => n.remove());
-            if(searchQuery && !anyVisible) {
-                document.querySelectorAll('.location-column').forEach(col => {
-                    const msg = document.createElement('div');
-                    msg.className = 'no-results';
-                    msg.textContent = 'No matches';
-                    col.appendChild(msg);
-                });
-            }
-        }
-
-        window.setSort = function(mode) {
-            sortMode = mode;
-            document.getElementById('sort-number')?.classList.toggle('active', mode === 'number');
-            document.getElementById('sort-alpha')?.classList.toggle('active', mode === 'alpha');
-            renderList();
-        };
-
-        window.onSearch = function(val) {
-            searchQuery = (val || '').toLowerCase().trim();
-            applyCardVisibility();
-        };
-
-        // ─────────────────────────────────────────
-        // Build panel HTML
-        // ─────────────────────────────────────────
-        function buildPanel(l) {
-            const lid = locId(l);
-            const d = data[lid];
-            const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(l.a)}`;
-            const opens  = getOpenTickets(d);
-            const closed = getClosedTickets(d);
-
-            let html = `<div class="panel">
-                <div class="panel-title">${l.n}</div>
-                <div class="panel-addr" onclick="window.open('${mapsUrl}','_blank')">📍 ${l.a}</div>`;
-
-            // ── Open tickets — one full editor each ──
-            opens.forEach(t => { html += buildActiveTicket(lid, t); });
-
-            // ── New ticket button ──
-            html += `<button class="btn-new-ticket" onclick="window.createTicket('${lid}')">＋ Open New Ticket</button>`;
-
-            // ── Closed tickets — collapsed, but expand into the SAME full
-            //    editable editor (closed tickets stay editable). ──
-            if(closed.length > 0) {
-                html += `<hr class="section-divider">
-                    <div class="history-section">
-                        <div class="history-header">✓ Paid Tickets (${closed.length})</div>`;
-                closed.forEach(t => {
-                    const displayDate = t.v || (t.createdAt ? new Date(t.createdAt).toLocaleDateString() : 'No date');
-                    html += `<div class="closed-ticket">
-                        <div class="closed-ticket-header" onclick="this.nextElementSibling.classList.toggle('open')">
-                            <span class="closed-ticket-label">Ticket ${t.ticketNo ? '#' + t.ticketNo : ''} — ${displayDate}</span>
-                            <span class="badge-status status-green" style="font-size:10px;">Paid</span>
-                        </div>
-                        <div class="closed-ticket-body">
-                            ${buildActiveTicket(lid, t)}
-                        </div>
-                    </div>`;
-                });
-                html += `</div>`;
-            }
-
-            html += `</div>`;
-            return html;
-        }
-
-        // Build one open-ticket editor. Element IDs are scoped by ticket id
-        // (tk-<field>-<tkId>) so multiple open tickets never collide.
-        function buildActiveTicket(lid, open) {
-            const tkId = open.id;
-            const notes = open.notes || [];
-            const notesListHtml = notes.map((n, i) => {
-                const photos = notePhotos(n);
-                const isInvoice = !!n.invoice;
-                const photoHtml = photos.length
-                    ? `<div class="note-photo-grid">${photos.map(u => photoThumb(u)).join('')}</div>`
-                    : '';
-                return `
-                <div class="note-item draggable${isInvoice ? ' note-invoice' : ''}" draggable="true" data-note-index="${i}"
-                     ondragstart="window.noteDragStart(event,'${lid}','${tkId}',${i})"
-                     ondragover="window.noteDragOver(event)"
-                     ondragleave="window.noteDragLeave(event)"
-                     ondrop="window.noteDrop(event,'${lid}','${tkId}',${i})"
-                     ondragend="window.noteDragEnd(event)">
-                    <span class="note-drag-handle" title="Drag to reorder">⠿</span>
-                    <div class="note-item-content">
-                        <div class="note-item-date">${new Date(n.t).toLocaleString()}${isInvoice ? ' <span class="invoice-tag">🧾 Invoice</span>' : ''}</div>
-                        ${n.n ? `<div class="note-item-text">${n.n}</div>` : ''}
-                        ${photoHtml}
-                    </div>
-                </div>`;
-            }).join('');
-
-            const closed = isClosed(open);
-            return `<div class="active-ticket-section${closed ? ' closed-editor' : ''}">
-                <div class="active-ticket-label">${closed ? '✓ Paid Ticket' : '🎫 Active Ticket'}${open.ticketNo ? ' #' + open.ticketNo : ''}</div>
-                <div class="form-group">
-                    <label class="form-label">Ticket #</label>
-                    <input type="text" class="form-input" id="tk-no-${tkId}" value="${open.ticketNo || ''}" placeholder="invoice # (overwrites auto code)">
-                    <div style="font-size:10px;color:var(--text2);margin-top:4px;">Auto code is a 3-char ID. Replace it with the invoice number when you have it.</div>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Status</label>
-                    <select class="form-select" id="tk-s-${tkId}" onchange="window.previewStatus('${lid}')">
-                        <option value="red"       ${open.s==='red'?       'selected':''}>Not Started</option>
-                        <option value="yellow"    ${open.s==='yellow'?    'selected':''}>In Progress</option>
-                        <option value="darkgreen" ${open.s==='darkgreen'? 'selected':''}>Done &amp; Unpaid</option>
-                        <option value="green"     ${open.s==='green'?     'selected':''}>Paid</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Visit Date</label>
-                    <input type="date" class="form-input" id="tk-v-${tkId}" value="${open.v || ''}">
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Issue Description</label>
-                    <textarea class="form-textarea" id="tk-i-${tkId}">${open.issue || ''}</textarea>
-                </div>
-                ${notesListHtml ? `<div class="form-label" style="margin-bottom:6px;">Notes</div><div class="notes-list">${notesListHtml}</div>` : ''}
-                <div class="add-note-area">
-                    <div class="add-note-label">Add Note</div>
-                    <textarea class="add-note-textarea" id="tk-n-${tkId}" placeholder="Type a note..."></textarea>
-                    <div class="add-note-photo-row">
-                        <input type="file" accept="image/*" multiple id="tk-f-${tkId}" style="display:none" onchange="window.handleNotePhotos('${lid}','${tkId}',this)">
-                        <button class="add-note-photo-btn" onclick="document.getElementById('tk-f-${tkId}').click()">📎 Attach Photos (up to 5)</button>
-                        <input type="file" accept="image/*" id="tk-inv-${tkId}" style="display:none" onchange="window.handleInvoice('${lid}','${tkId}',this)">
-                        <button class="add-note-photo-btn" onclick="document.getElementById('tk-inv-${tkId}').click()">🧾 Add Invoice</button>
-                        <span class="upload-status" id="tk-upload-${tkId}"></span>
-                        <input type="hidden" id="tk-p-${tkId}" value="">
-                    </div>
-                    <div class="preview-grid" id="tk-previews-${tkId}"></div>
-                </div>
-                <div class="btn-group" style="margin-top:10px;">
-                    <button class="btn btn-primary"   onclick="window.saveTicket('${lid}','${tkId}')">💾 Save</button>
-                    ${closed
-                        ? `<button class="btn btn-secondary" onclick="window.setTicketStatus('${lid}','${tkId}','red')">↩ Reopen</button>`
-                        : `<button class="btn btn-success" onclick="window.setTicketStatus('${lid}','${tkId}','green')">✓ Mark Paid</button>`}
-                    <button class="btn btn-danger"    onclick="window.deleteTicket('${lid}','${tkId}')">🗑</button>
-                </div>
-            </div>`;
-        }
-
-        // Render a photo thumbnail, or a PDF link tile for PDF invoices.
-        function photoThumb(u) {
-            const isPdf = /\.pdf($|\?)/i.test(u);
-            if(isPdf) {
-                return `<a class="pdf-tile" href="${u}" target="_blank" title="Open PDF">📄 PDF</a>`;
-            }
-            return `<img src="${u}" onclick="window.open('${u}','_blank')" title="Click to open full size">`;
-        }
-
-        // ─────────────────────────────────────────
-        // Markers
-        // ─────────────────────────────────────────
-        function addMarkers() {
-            locs.forEach(l => {
-                const lid = locId(l);
-                if(l.special) {
-                    const m = L.circleMarker([l.t, l.g], { radius:10, fillColor:'#a855f7', fillOpacity:1, color:'#fff', weight:2 }).addTo(map);
-                    markers[lid] = {m, l};
-                } else {
-                    const m = L.circleMarker([l.t, l.g], {
-                        radius:8, fillColor: getMarkerColor(data[lid]), fillOpacity:1, color:'#fff', weight:2
-                    }).addTo(map).bindPopup('', {maxWidth:390});
-                    m.on('popupopen', () => m.setPopupContent(buildPanel(l)));
-                    markers[lid] = {m, l};
-                }
-            });
-        }
-
-        function updateMarker(lid) {
-            if(markers[lid] && !markers[lid].l.special) {
-                markers[lid].m.setStyle({ fillColor: getMarkerColor(data[lid]) });
-            }
-        }
-
-        // ─────────────────────────────────────────
-        // Ticket actions
-        // ─────────────────────────────────────────
-        window.previewStatus = function(lid) {
-            // Reflect the most urgent status across all open-ticket selects in the panel.
-            if(!markers[lid]) return;
-            const opens = getOpenTickets(data[lid]);
-            let best = null, bestRank = -1;
-            opens.forEach(t => {
-                const el = document.getElementById(`tk-s-${t.id}`);
-                const v = el ? el.value : (t.s || 'blue');
-                const r = STATUS_URGENCY[v] || 0;
-                if(r > bestRank) { bestRank = r; best = v; }
-            });
-            if(best) markers[lid].m.setStyle({ fillColor: statusColor(best) });
-        };
-
-        window.saveTicket = async function(lid, tkId) {
-            try {
-                const existing = data[lid]?.tickets?.[tkId] || {};
-                const notes = [...(existing.notes || [])];
-
-                const noteText = document.getElementById(`tk-n-${tkId}`)?.value.trim() || '';
-                const photoRaw = document.getElementById(`tk-p-${tkId}`)?.value || '';
-                let photoUrls = [];
-                try { photoUrls = photoRaw ? JSON.parse(photoRaw) : []; } catch(e) { photoUrls = []; }
-                if(noteText || photoUrls.length) {
-                    const newNote = { n: noteText, t: new Date().toISOString() };
-                    if(photoUrls.length) newNote.photoUrls = photoUrls;
-                    notes.push(newNote);
-                }
-                const updated = {
-                    ...existing,
-                    ticketNo: document.getElementById(`tk-no-${tkId}`)?.value ?? existing.ticketNo ?? '',
-                    s:     document.getElementById(`tk-s-${tkId}`).value,
-                    v:     document.getElementById(`tk-v-${tkId}`).value,
-                    issue: document.getElementById(`tk-i-${tkId}`).value,
-                    notes
-                };
-
-                await set(ref(db, `awtTickets/${lid}/tickets/${tkId}`), updated);
-                renderFromData();
-                alert('✓ Saved!');
-            } catch(err) {
-                alert('Error saving: ' + err.message);
-            }
-        };
-
-        // Quick status shortcut used by the "Mark Paid" / "Reopen" buttons.
-        // Saves any pending edits in the editor first, then sets the status.
-        window.setTicketStatus = async function(lid, tkId, newStatus) {
-            try {
-                const existing = data[lid]?.tickets?.[tkId] || {};
-                const notes = [...(existing.notes || [])];
-                const noteText = document.getElementById(`tk-n-${tkId}`)?.value.trim() || '';
-                const photoRaw = document.getElementById(`tk-p-${tkId}`)?.value || '';
-                let photoUrls = [];
-                try { photoUrls = photoRaw ? JSON.parse(photoRaw) : []; } catch(e) { photoUrls = []; }
-                if(noteText || photoUrls.length) {
-                    const newNote = { n: noteText, t: new Date().toISOString() };
-                    if(photoUrls.length) newNote.photoUrls = photoUrls;
-                    notes.push(newNote);
-                }
-                const updated = {
-                    ...existing,
-                    ticketNo: document.getElementById(`tk-no-${tkId}`)?.value ?? existing.ticketNo ?? '',
-                    v:        document.getElementById(`tk-v-${tkId}`)?.value  ?? existing.v ?? '',
-                    issue:    document.getElementById(`tk-i-${tkId}`)?.value  ?? existing.issue ?? '',
-                    notes,
-                    s:        newStatus
-                };
-                await set(ref(db, `awtTickets/${lid}/tickets/${tkId}`), updated);
-                renderFromData();
-                markers[lid]?.m.closePopup();
-                window.closeModal();
-            } catch(err) {
-                alert('Error updating ticket: ' + err.message);
-            }
-        };
-
-        window.deleteTicket = async function(lid, tkId) {
-            if(!confirm('Permanently delete this ticket? This cannot be undone.')) return;
-            try {
-                await set(ref(db, `awtTickets/${lid}/tickets/${tkId}`), null);
-                renderFromData();
-                markers[lid]?.m.closePopup();
-                window.closeModal();
-            } catch(err) {
-                alert('Error deleting: ' + err.message);
-            }
-        };
-
-        // Auto ticket code: 3-char alphanumeric with AT LEAST ONE LETTER
-        // (e.g. "A7K", "X29", "QM4") so it can never come out all-digits and
-        // be mistaken for one of your numeric invoice numbers (5-6 digits).
-        // Checked for uniqueness so two autos never collide.
-        function nextTicketNo() {
-            const letters = 'ABCDEFGHJKLMNPQRSTUVWXYZ';  // no I,O (ambiguous)
-            const alnum   = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no I,O,0,1
-            const existing = new Set();
-            Object.values(data || {}).forEach(loc => {
-                Object.values(loc?.tickets || {}).forEach(t => {
-                    if(t.ticketNo) existing.add(String(t.ticketNo).toUpperCase());
-                });
-            });
-            const pick = s => s[Math.floor(Math.random() * s.length)];
-            let code;
-            do {
-                // Build 3 chars, then force one random position to be a letter.
-                const arr = [pick(alnum), pick(alnum), pick(alnum)];
-                arr[Math.floor(Math.random() * 3)] = pick(letters);
-                code = arr.join('');
-            } while(existing.has(code));
-            return code;
-        }
-
-        window.createTicket = async function(lid) {
-            try {
-                const tkId = newTicketId();
-                const ticket = { ticketNo: nextTicketNo(), s:'red', v:'', issue:'', notes:[], createdAt: new Date().toISOString() };
-                await set(ref(db, `awtTickets/${lid}/tickets/${tkId}`), ticket);
-                renderFromData();
-            } catch(err) {
-                alert('Error creating ticket: ' + err.message);
-            }
-        };
-
-        // ─────────────────────────────────────────
-        // Multi-photo upload (imgbb) — up to 5 at once
-        // ─────────────────────────────────────────
-        const MAX_PHOTOS = 5;
-
-        window.handleNotePhotos = async function(lid, tkId, inputEl) {
-            const hiddenEl  = document.getElementById(`tk-p-${tkId}`);
-            const statusEl  = document.getElementById(`tk-upload-${tkId}`);
-
-            let current = [];
-            try { current = hiddenEl.value ? JSON.parse(hiddenEl.value) : []; } catch(e) { current = []; }
-
-            let files = Array.from(inputEl.files || []).filter(f => f.type.startsWith('image/'));
-            if(files.length === 0) { inputEl.value=''; return; }
-
-            const room = MAX_PHOTOS - current.length;
-            if(room <= 0) { alert(`You can attach up to ${MAX_PHOTOS} photos per note.`); inputEl.value=''; return; }
-            if(files.length > room) {
-                alert(`Only ${room} more photo(s) can be added (max ${MAX_PHOTOS}). Extra files were skipped.`);
-                files = files.slice(0, room);
-            }
-
-            statusEl.textContent = `Uploading ${files.length}…`;
-
-            try {
-                const uploads = files.map(async file => {
-                    const formData = new FormData();
-                    formData.append('image', file);
-                    const res  = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, { method:'POST', body:formData });
-                    const json = await res.json();
-                    if(!json.success) throw new Error(json.error?.message || 'Upload failed');
-                    return json.data.url;
-                });
-                const urls = await Promise.all(uploads);
-                current = [...current, ...urls];
-                hiddenEl.value = JSON.stringify(current);
-                statusEl.textContent = `✓ ${current.length} ready`;
-                renderPreviews(tkId);
-            } catch(err) {
-                statusEl.textContent = '';
-                alert('Photo upload failed: ' + err.message);
-            } finally {
-                inputEl.value = '';
-            }
-        };
-
-        function renderPreviews(tkId) {
-            const hiddenEl = document.getElementById(`tk-p-${tkId}`);
-            const gridEl   = document.getElementById(`tk-previews-${tkId}`);
-            if(!gridEl) return;
-            let urls = [];
-            try { urls = hiddenEl.value ? JSON.parse(hiddenEl.value) : []; } catch(e) { urls = []; }
-            gridEl.innerHTML = urls.map((u, i) => `
-                <span class="preview-thumb-wrap">
-                    <img src="${u}" class="note-photo-preview" onclick="window.open('${u}','_blank')">
-                    <button class="thumb-remove" title="Remove" onclick="window.removeNotePhoto('${tkId}',${i})">✕</button>
-                </span>`).join('');
-        }
-
-        window.removeNotePhoto = function(tkId, idx) {
-            const hiddenEl = document.getElementById(`tk-p-${tkId}`);
-            let urls = [];
-            try { urls = hiddenEl.value ? JSON.parse(hiddenEl.value) : []; } catch(e) { urls = []; }
-            urls.splice(idx, 1);
-            hiddenEl.value = urls.length ? JSON.stringify(urls) : '';
-            const statusEl = document.getElementById(`tk-upload-${tkId}`);
-            if(statusEl) statusEl.textContent = urls.length ? `✓ ${urls.length} ready` : '';
-            renderPreviews(tkId);
-        };
-
-        // ─────────────────────────────────────────
-        // Invoice upload — image only (a screenshot of the invoice). Saves
-        // immediately as its own note flagged invoice:true (🧾 label).
-        // ─────────────────────────────────────────
-        window.handleInvoice = async function(lid, tkId, inputEl) {
-            const file = inputEl.files?.[0];
-            if(!file) return;
-            if(!file.type.startsWith('image/')) { alert('Invoice must be an image (a screenshot is fine).'); inputEl.value=''; return; }
-
-            const statusEl = document.getElementById(`tk-upload-${tkId}`);
-            if(statusEl) statusEl.textContent = 'Uploading invoice…';
-
-            try {
-                const formData = new FormData();
-                formData.append('image', file);
-                const res  = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, { method:'POST', body:formData });
-                const json = await res.json();
-                if(!json.success) throw new Error(json.error?.message || 'Upload failed');
-                const url = json.data.url;
-
-                // Append as a dedicated invoice note, preserving existing notes.
-                const existing = data[lid]?.tickets?.[tkId] || {};
-                const notes = [...(existing.notes || [])];
-                notes.push({ n: 'Invoice', t: new Date().toISOString(), photoUrls: [url], invoice: true });
-                await set(ref(db, `awtTickets/${lid}/tickets/${tkId}/notes`), notes);
-
-                if(statusEl) statusEl.textContent = '✓ Invoice added';
-                renderFromData();
-            } catch(err) {
-                if(statusEl) statusEl.textContent = '';
-                alert('Invoice upload failed: ' + err.message);
-            } finally {
-                inputEl.value = '';
-            }
-        };
-
-        // ─────────────────────────────────────────
-        // Drag-and-drop note reordering (timestamps preserved)
-        // ─────────────────────────────────────────
-        let dragState = null;
-
-        window.noteDragStart = function(ev, lid, tkId, index) {
-            dragState = { lid, tkId, from: index };
-            ev.dataTransfer.effectAllowed = 'move';
-            ev.currentTarget.classList.add('dragging');
-        };
-        window.noteDragOver = function(ev) {
-            ev.preventDefault();
-            ev.dataTransfer.dropEffect = 'move';
-            const item = ev.currentTarget;
-            if(!item.classList.contains('dragging')) item.classList.add('drag-over');
-        };
-        window.noteDragLeave = function(ev) {
-            ev.currentTarget.classList.remove('drag-over');
-        };
-        window.noteDragEnd = function(ev) {
-            ev.currentTarget.classList.remove('dragging');
-            document.querySelectorAll('.note-item.drag-over').forEach(n => n.classList.remove('drag-over'));
-        };
-        window.noteDrop = async function(ev, lid, tkId, toIndex) {
-            ev.preventDefault();
-            ev.currentTarget.classList.remove('drag-over');
-            if(!dragState || dragState.lid !== lid || dragState.tkId !== tkId) return;
-            const from = dragState.from;
-            dragState = null;
-            if(from === toIndex) return;
-
-            const ticket = data[lid]?.tickets?.[tkId];
-            if(!ticket || !Array.isArray(ticket.notes)) return;
-            const notes = [...ticket.notes];           // each note keeps its own t (timestamp)
-            const [moved] = notes.splice(from, 1);
-            notes.splice(toIndex, 0, moved);
-
-            try {
-                await set(ref(db, `awtTickets/${lid}/tickets/${tkId}/notes`), notes);
-                renderFromData();
-            } catch(err) {
-                alert('Error reordering notes: ' + err.message);
-            }
-        };
-
-        // ─────────────────────────────────────────
-        // Mobile modal
-        // ─────────────────────────────────────────
-        function openMobilePanel(l) {
-            document.getElementById('modal-body').innerHTML = buildPanel(l);
-            document.getElementById('modal').classList.add('active');
-            document.body.style.overflow = 'hidden';
-        }
-
-        window.closeModal = function() {
-            document.getElementById('modal').classList.remove('active');
-            document.body.style.overflow = '';
-        };
-
-        window.scrollToTop = function() {
-            // On mobile the whole page scrolls; on desktop the sidebar does.
-            window.scrollTo({ top:0, behavior:'smooth' });
-            document.querySelector('.sidebar')?.scrollTo({ top:0, behavior:'smooth' });
-        };
-
-        // Re-render everything from the current ticket cache.
-        // True when the user is actively editing a field inside the open
-        // ticket panel/modal — used to avoid clobbering unsaved input.
-        function isEditingTicket() {
-            const el = document.activeElement;
-            if(!el) return false;
-            const tag = el.tagName;
-            if(tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') return false;
-            // Only count fields that live inside a ticket panel or the modal.
-            return !!el.closest('.panel, #modal');
-        }
-
-        // Re-render everything from current ticket data.
-        // `polite` = true means "don't disturb the user": if they're mid-edit,
-        // skip the panel/modal rebuild (which would discard unsaved typing) and
-        // only refresh the background map markers, stats, and card list.
-        function renderFromData(polite) {
-            Object.keys(markers).forEach(updateMarker);
-            updateStats();
-            renderList();
-
-            if(polite && isEditingTicket()) return; // leave the open editor alone
-
-            Object.values(markers).forEach(mk => {
-                if(mk.m.isPopupOpen()) mk.m.setPopupContent(buildPanel(mk.l));
-            });
-            const modal = document.getElementById('modal');
-            if(modal.classList.contains('active')) {
-                const title = modal.querySelector('.panel-title')?.textContent;
-                const l = title ? locs.find(x => x.n === title) : null;
-                if(l) document.getElementById('modal-body').innerHTML = buildPanel(l);
-            }
-        }
-
-        // Fetch the latest tickets from the API and re-render. Called on load,
-        // after every write, and on a slow interval. `polite` is passed through
-        // so the periodic poll won't wipe what you're currently typing.
-        window.refreshTickets = async function(polite) {
-            try {
-                const snap = await get(ref(db, TICKETS_NODE));
-                data = snap.val() || {};
-                renderFromData(polite);
-            } catch(err) {
-                console.error("Failed to refresh tickets:", err);
-            }
-        };
-
-        // ─────────────────────────────────────────
-        // Initialization Boot Sequence
-        // ─────────────────────────────────────────
-        (async () => {
-            try {
-                // 1. Load restaurant records (only the restaurants slice of the
-                //    master DB payload is used; other nodes are ignored).
-                const snap = await get(ref(dbLocs, 'restaurants'));
-                const rawRestaurants = snap.val() || {};
-
-                // 2. Convert raw records into expected locs format
-                const loadedLocs = Object.values(rawRestaurants).map(r => ({
-                    n: r.storeName || "",
-                    a: r.address || "",
-                    t: parseFloat(r.latitude || "0"),
-                    g: parseFloat(r.longitude || "0")
-                })).filter(l => l.t && l.g);
-
-                // 3. Append the two special locations
-                locs = [
-                    {n:"DPM Office",a:"520 E NW Hwy, Grapevine, TX 76051",t:32.9418,g:-97.0725,special:true},
-                    {n:"AWT Office",a:"105 W Washington St, Rockwall, TX 75087",t:32.9300,g:-96.4609,special:true},
-                    ...loadedLocs
-                ];
-
-                // 4. Build map markers (must happen after locations have loaded)
-                addMarkers();
-
-                // 5. Initial ticket load
-                await refreshTickets();
-
-                // 5b. One-time migration: convert any old archived tickets to
-                //     the single-status model (archived:true → status Closed).
-                await migrateArchivedToClosed();
-                await refreshTickets();
-
-                // 6. Poll for other users' changes every 20s (no live push on API).
-                setInterval(() => { window.refreshTickets(true); }, 20000);
-
-            } catch (err) {
-                console.error("Failed to load data from API:", err);
-            }
-        })();
-    </script>
+        <div class="card-desc">${esc(t.description||"(no description)")}</div>
+        <div class="card-id">${t.createdAt?("Filed "+fmtDate(t.createdAt)):""}</div>
+      </div>`;
+    }).join("");
+    return `<div class="store">
+      <div class="store-h">${esc(storeName(sid))} ${storeNum(sid)?`<small>· #${esc(storeNum(sid))}</small>`:""}</div>
+      ${cards}</div>`;
+  }).join("");
+}
+
+window.toggleFilter=function(s){ curFilter=curFilter===s?null:s; render(); };
+window.onSearch=function(v){ curSearch=(v||"").trim(); render(); };
+
+// ── Ticket detail ──
+window.openTicket=function(id){
+  openId=id;
+  const t={_id:id,...TICKETS[id]};
+  const v=statusView(t.status);
+  const photos=Array.isArray(t.photos)?t.photos:[];
+  const photoHtml=photos.length?`<div class="field-label">Photos</div><div class="photo-grid">${
+    photos.map(u=>`<img src="${esc(u)}" onclick="lightbox('${esc(u)}')">`).join("")}</div>`:"";
+  const comments=Array.isArray(t.comments)?t.comments:[];
+  const cmtHtml=comments.length?comments.map(c=>`
+    <div class="cmt"><div class="cmt-meta">${esc(c.by||"")} · ${fmtDate(c.ts)}</div>
+      <div class="cmt-text">${esc(c.text||"")}</div></div>`).join("")
+    :`<div style="color:var(--text2);font-size:13px">No comments yet.</div>`;
+
+  // vendor status buttons (only the flow this board drives)
+  const statusBtns=VENDOR_FLOW.map(s=>{
+    const sv=VENDOR_STATUS[s]; const cur=t.status===s?" cur":"";
+    return `<button class="status-btn b-${s}${cur}" onclick="setStatus('${id}','${s}')">${esc(sv.label)}</button>`;
+  }).join("");
+
+  $("sheet").innerHTML=`
+    <div class="sheet-h"><h2>#${esc(t.shortId||id.slice(0,6))}</h2><button class="x" onclick="closeModal()">✕ Close</button></div>
+    <div class="sheet-b">
+      <div class="field-label">Store</div>
+      <div class="val">${esc(storeName(t.storeId))}${storeNum(t.storeId)?(" · #"+esc(storeNum(t.storeId))):""}
+        ${storeAddr(t.storeId)?`<div style="font-size:12px;color:var(--text2)">${esc(storeAddr(t.storeId))}</div>`:""}</div>
+      <div class="field-label">Status</div>
+      <div class="status-row">${statusBtns}</div>
+      <div class="field-label">Job</div>
+      <div class="val">${esc(t.description||"(no description)")}</div>
+      ${photoHtml}
+      <div class="field-label">Comments</div>
+      <div class="cmts" id="cmts">${cmtHtml}</div>
+      <textarea class="cmt-in" id="cmtIn" placeholder="Add a comment…"></textarea>
+      <button class="btn btn-primary" id="cmtSend" onclick="postComment('${id}')" style="margin-top:8px;width:100%">Post comment</button>
+    </div>`;
+  $("modal").classList.add("on");
+  document.body.style.overflow="hidden";
+};
+window.closeModal=function(){ $("modal").classList.remove("on"); document.body.style.overflow=""; openId=null; };
+window.lightbox=function(u){ $("lightboxImg").src=u; $("lightbox").classList.add("on"); };
+
+// ── Writes (status + comments) — to the SAME ticket record ──
+window.setStatus=async function(id,s){
+  const t=TICKETS[id]; if(!t||t.status===s) { closeModal(); return; }
+  const activity=Array.isArray(t.activity)?t.activity.slice():[];
+  activity.push({ts:now(),by:(VENDOR&&VENDOR.name)||VENDOR_ID,role:"vendor",action:"status",toStatus:s,note:"via vendor board"});
+  const updated={...t,status:s,activity,updatedAt:now()};
+  delete updated._id;
+  try{
+    await apiWriteTicket(id,updated);
+    TICKETS[id]=updated;
+    toast("Status updated · "+statusView(s).label);
+    render(); openTicket(id);
+  }catch(e){ toast(e.message||"Update failed","err"); }
+};
+
+window.postComment=async function(id){
+  const inp=$("cmtIn"); const text=(inp.value||"").trim();
+  if(!text){toast("Write something first","err");return}
+  const btn=$("cmtSend"); btn.disabled=true; btn.innerHTML='<span class="spin"></span>';
+  const t=TICKETS[id];
+  const comments=Array.isArray(t.comments)?t.comments.slice():[];
+  comments.push({id:uid(),by:(VENDOR&&VENDOR.name)||VENDOR_ID,role:"vendor",text,ts:now()});
+  const updated={...t,comments,updatedAt:now()}; delete updated._id;
+  try{
+    await apiWriteTicket(id,updated);
+    TICKETS[id]=updated;
+    toast("Comment posted"); openTicket(id);
+  }catch(e){ btn.disabled=false; btn.textContent="Post comment"; toast(e.message||"Failed","err"); }
+};
+
+// ── Boot + poll ──
+async function refresh(){
+  const dot=$("poll"); dot.textContent="syncing…";
+  try{
+    // Don't clobber the detail view if it's open and the user may be typing.
+    const typing=document.activeElement && document.activeElement.id==="cmtIn";
+    await load();
+    if(!openId || !typing) render();
+    if(openId && !typing) openTicket(openId);   // refresh open ticket with latest
+  }catch(e){ /* keep last good render */ }
+  dot.textContent="live";
+}
+
+(async()=>{
+  try{ await load(); render(); }
+  catch(e){ $("list").innerHTML=`<div class="empty">Couldn't load: ${esc(e.message||e)}</div>`; }
+  setInterval(refresh, POLL_MS);
+})();
+</script>
 </body>
 </html>
