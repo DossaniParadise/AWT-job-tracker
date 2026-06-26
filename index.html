@@ -107,6 +107,8 @@
   .invoice-tag{color:var(--yellow);font-weight:700;font-size:10px;margin-left:6px}
   .cmt-text{font-size:13px;line-height:1.4;overflow-wrap:anywhere;white-space:pre-wrap}
   .cmt-img{margin-top:6px;max-width:140px;max-height:140px;border-radius:6px;border:1px solid var(--border);cursor:pointer;display:block}
+  .cmt-del{margin-top:8px;background:transparent;color:var(--red);border:1px solid var(--red);border-radius:6px;padding:5px 10px;font-family:inherit;font-size:11px;font-weight:700;cursor:pointer}
+  .cmt-del:hover{background:rgba(255,107,107,.12)}
   textarea.cmt-in{width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:13px;padding:10px;min-height:60px;resize:vertical;outline:none}
   textarea.cmt-in:focus{border-color:var(--blue)}
   .btn{padding:10px 14px;border:none;border-radius:8px;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer}
@@ -362,10 +364,13 @@ window.openTicket=function(id){
   const cmtHtml=comments.length?comments.map(c=>{
     const isInv=!!c.invoice;
     const img=c.fileUrl?`<img class="cmt-img" src="${esc(c.fileUrl)}" onclick="lightbox('${esc(c.fileUrl)}')">`:"";
+    // Only vendor-uploaded invoices get a delete control (job photos from RM
+    // are not removable here). Identified by invoice:true + a comment id.
+    const del=(isInv && c.id)?`<button class="cmt-del" onclick="deleteInvoice('${id}','${esc(c.id)}')">🗑 Delete invoice</button>`:"";
     return `<div class="cmt${isInv?" invoice":""}">
       <div class="cmt-meta">${esc(c.by||"")} · ${fmtDate(c.ts)}${isInv?' <span class="invoice-tag">🧾 Invoice</span>':''}</div>
       ${c.text?`<div class="cmt-text">${esc(c.text)}</div>`:""}
-      ${img}</div>`;
+      ${img}${del}</div>`;
   }).join("")
     :`<div style="color:var(--text2);font-size:13px">No comments yet.</div>`;
 
@@ -472,6 +477,24 @@ window.uploadInvoice=async function(id,inputEl){
     if(btn) btn.disabled=false;
     toast("Invoice upload failed: "+(e.message||e),"err");
   }finally{ inputEl.value=""; }
+};
+
+// Delete a vendor-uploaded invoice. Removes ONLY that comment (matched by its
+// id) and only if it's flagged invoice:true — job photos from RM are never
+// touched. Asks for confirmation first.
+window.deleteInvoice=async function(id,commentId){
+  const t=TICKETS[id]; if(!t) return;
+  const comments=Array.isArray(t.comments)?t.comments:[];
+  const target=comments.find(c=>c && c.id===commentId && c.invoice);
+  if(!target){ toast("Invoice not found","err"); return; }
+  if(!confirm("Delete this invoice? This can't be undone.")) return;
+  const next=comments.filter(c=>!(c && c.id===commentId && c.invoice));
+  const updated={...t,comments:next,updatedAt:now()}; delete updated._id;
+  try{
+    await apiWriteTicket(id,updated);
+    TICKETS[id]=updated;
+    toast("Invoice deleted"); openTicket(id);
+  }catch(e){ toast(e.message||"Delete failed","err"); }
 };
 
 // ── Boot + poll ──
