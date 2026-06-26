@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
-<title>AWT Job Board v2.0</title>
+<title>AWT Dossani Job Board</title>
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
@@ -143,6 +143,7 @@
 
 // ── Board identity: the only thing that changes per vendor board ──
 const VENDOR_ID = "AWT";   // ← set to the maintenanceVendors key for this board
+const BOARD_TITLE = "AWT Dossani Job Board";   // ← shown in the header & tab
 
 const API_BASE_URL = "https://alignment-api-khaki.vercel.app/api/dpm-alignment";
 const WRITE_PASSWORD = "vendor123";   // ROLES.VENDOR on the API
@@ -198,7 +199,8 @@ async function load(){
   TICKETS=data.maintenanceTickets||{};
   RESTAURANTS=data.restaurants||{};
   VENDOR=data.vendor||null;
-  $("boardTitle").textContent=(VENDOR&&VENDOR.name?VENDOR.name:VENDOR_ID)+" Job Board";
+  $("boardTitle").textContent=BOARD_TITLE;
+  document.title=BOARD_TITLE;
   $("boardSub").textContent=Object.keys(TICKETS).length+" jobs · "+Object.keys(RESTAURANTS).length+" stores";
 }
 
