@@ -102,13 +102,18 @@
 
   .cmts{display:flex;flex-direction:column;gap:8px;margin-top:6px}
   .cmt{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:9px 11px}
+  .cmt.invoice{border-color:var(--yellow)}
   .cmt-meta{font-size:10px;color:var(--text2);margin-bottom:3px}
+  .invoice-tag{color:var(--yellow);font-weight:700;font-size:10px;margin-left:6px}
   .cmt-text{font-size:13px;line-height:1.4;overflow-wrap:anywhere;white-space:pre-wrap}
+  .cmt-img{margin-top:6px;max-width:140px;max-height:140px;border-radius:6px;border:1px solid var(--border);cursor:pointer;display:block}
   textarea.cmt-in{width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:13px;padding:10px;min-height:60px;resize:vertical;outline:none}
   textarea.cmt-in:focus{border-color:var(--blue)}
   .btn{padding:10px 14px;border:none;border-radius:8px;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer}
   .btn-primary{background:var(--blue);color:#0a0e27}
+  .btn-invoice{background:var(--bg2);color:var(--yellow);border:1px solid var(--yellow)}
   .btn[disabled]{opacity:.5;cursor:default}
+  .upload-note{font-size:11px;color:var(--text2);margin-top:6px}
   .spin{display:inline-block;width:13px;height:13px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite;vertical-align:middle}
   @keyframes sp{to{transform:rotate(360deg)}}
   .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:11px 18px;font-size:13px;z-index:2000;opacity:0;transition:.2s;pointer-events:none}
@@ -179,6 +184,7 @@
 // `vendorKey`, which we use for write-backs.
 const VENDOR_NAME = "AWT";   // ← must match the vendor's NAME in RM's vendor list
 const BOARD_TITLE = "AWT Dossani Job Board";   // ← shown in the header & tab
+const IMGBB_API_KEY = "b733862d15744e2bfaa4329d122f4ba0";   // image host for invoice uploads
 
 const API_BASE_URL = "https://alignment-api-khaki.vercel.app/api/dpm-alignment";
 const WRITE_PASSWORD = "vendor123";   // ROLES.VENDOR on the API
@@ -295,8 +301,12 @@ function render(){
   const storeIds=Object.keys(byStore);
   if(!storeIds.length){ list.innerHTML=`<div class="empty">No jobs${curFilter||curSearch?" match this view":" assigned yet"}.</div>`; return; }
 
-  // Sort by store number then name.
+  // Sort stores: those with the most urgent OPEN work first (Not Started >
+  // In Progress > … > Paid), then by store number within the same status.
+  const storeUrgency=sid=>STATUS_URGENCY[mostUrgent(byStore[sid])]||0;
   const sortStores=ids=>ids.sort((a,b)=>{
+    const ua=storeUrgency(a), ub=storeUrgency(b);
+    if(ua!==ub) return ub-ua;   // higher urgency (dispatched=5) first
     const na=parseInt(String(storeNum(a)).replace(/\D/g,""))||0, nb=parseInt(String(storeNum(b)).replace(/\D/g,""))||0;
     if(na&&nb) return na-nb; if(na) return -1; if(nb) return 1;
     return storeName(a).localeCompare(storeName(b));
@@ -349,9 +359,14 @@ window.openTicket=function(id){
   const photoHtml=photos.length?`<div class="field-label">Photos</div><div class="photo-grid">${
     photos.map(u=>`<img src="${esc(u)}" onclick="lightbox('${esc(u)}')">`).join("")}</div>`:"";
   const comments=Array.isArray(t.comments)?t.comments:[];
-  const cmtHtml=comments.length?comments.map(c=>`
-    <div class="cmt"><div class="cmt-meta">${esc(c.by||"")} · ${fmtDate(c.ts)}</div>
-      <div class="cmt-text">${esc(c.text||"")}</div></div>`).join("")
+  const cmtHtml=comments.length?comments.map(c=>{
+    const isInv=!!c.invoice;
+    const img=c.fileUrl?`<img class="cmt-img" src="${esc(c.fileUrl)}" onclick="lightbox('${esc(c.fileUrl)}')">`:"";
+    return `<div class="cmt${isInv?" invoice":""}">
+      <div class="cmt-meta">${esc(c.by||"")} · ${fmtDate(c.ts)}${isInv?' <span class="invoice-tag">🧾 Invoice</span>':''}</div>
+      ${c.text?`<div class="cmt-text">${esc(c.text)}</div>`:""}
+      ${img}</div>`;
+  }).join("")
     :`<div style="color:var(--text2);font-size:13px">No comments yet.</div>`;
 
   // vendor status buttons (only the flow this board drives)
@@ -385,7 +400,12 @@ window.openTicket=function(id){
       <div class="field-label">Comments</div>
       <div class="cmts" id="cmts">${cmtHtml}</div>
       <textarea class="cmt-in" id="cmtIn" placeholder="Add a comment…"></textarea>
-      <button class="btn btn-primary" id="cmtSend" onclick="postComment('${id}')" style="margin-top:8px;width:100%">Post comment</button>
+      <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+        <button class="btn btn-primary" id="cmtSend" onclick="postComment('${id}')" style="flex:1;min-width:140px">Post comment</button>
+        <input type="file" accept="image/*" id="invFile" style="display:none" onchange="uploadInvoice('${id}',this)">
+        <button class="btn btn-invoice" id="invBtn" onclick="document.getElementById('invFile').click()" style="flex:1;min-width:140px">🧾 Add Invoice</button>
+      </div>
+      <div class="upload-note" id="invStatus"></div>
     </div>`;
   $("modal").classList.add("on");
   document.body.style.overflow="hidden";
@@ -421,6 +441,37 @@ window.postComment=async function(id){
     TICKETS[id]=updated;
     toast("Comment posted"); openTicket(id);
   }catch(e){ btn.disabled=false; btn.textContent="Post comment"; toast(e.message||"Failed","err"); }
+};
+
+// Invoice upload — image only (a photo/screenshot of the invoice). Uploads to
+// imgbb, then saves as a dedicated comment flagged invoice:true with the image
+// URL in fileUrl. Same single ticket record, so RM sees it too. (PDF support
+// can be added later once a PDF-capable host is chosen.)
+window.uploadInvoice=async function(id,inputEl){
+  const file=inputEl.files&&inputEl.files[0];
+  if(!file){return;}
+  if(!file.type.startsWith("image/")){ toast("Invoice must be an image (a screenshot is fine).","err"); inputEl.value=""; return; }
+  const status=$("invStatus"); const btn=$("invBtn");
+  if(status) status.textContent="Uploading invoice…";
+  if(btn){ btn.disabled=true; }
+  try{
+    const fd=new FormData(); fd.append("image",file);
+    const res=await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`,{method:"POST",body:fd});
+    const json=await res.json();
+    if(!json.success) throw new Error((json.error&&json.error.message)||"Upload failed");
+    const url=json.data.url;
+    const t=TICKETS[id];
+    const comments=Array.isArray(t.comments)?t.comments.slice():[];
+    comments.push({id:uid(),by:(VENDOR&&VENDOR.name)||VENDOR_NAME,role:"vendor",text:"Invoice",ts:now(),invoice:true,fileUrl:url});
+    const updated={...t,comments,updatedAt:now()}; delete updated._id;
+    await apiWriteTicket(id,updated);
+    TICKETS[id]=updated;
+    toast("🧾 Invoice added"); openTicket(id);
+  }catch(e){
+    if(status) status.textContent="";
+    if(btn) btn.disabled=false;
+    toast("Invoice upload failed: "+(e.message||e),"err");
+  }finally{ inputEl.value=""; }
 };
 
 // ── Boot + poll ──
